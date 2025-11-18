@@ -19,12 +19,14 @@ function main(;
         color_btn_height = 30,
         num_color_cols = 4,
         sidebar_width = 200,
+        bottombar_height = 100,
         PICK_THRESHOLD = 20,
         )
 
     #######GLOBALS###########################
     
     ###markers for the scaling range selection
+    # a ring with a vertical bar 
     Ring = BezierPath([
             MoveTo(Point(1, 0)),
             EllipticalArc(Point(0, 0), 1, 1, 0, 0, 2pi),
@@ -50,7 +52,7 @@ function main(;
     
     #the current active curve
     current_curve = Observable(Point2f[])
-    ALL_CURVES = Vector{Vector{Point2f}}() #holds all the curves
+    ALL_CURVES = Vector{Any}() #holds all the curves
 
     #scaling range markers
     X1 = Point2f(10,10)
@@ -66,7 +68,9 @@ function main(;
 
     #currently dragged point (scale range or curve)
     dragged_index = Observable{Union{Nothing, Int}}(nothing)
-    #######Layout#############################
+
+
+    #######LAYOUT#############################
 
 
     fig = Figure()
@@ -74,47 +78,90 @@ function main(;
     ax_img = Axis(fig[1,1], aspect = DataAspect())
     deregister_interaction!(ax_img, :rectanglezoom) #just gets in the way when dragging
 
-    sidebar = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
+    SIDEBAR = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
-    hidden_layout = GridLayout(bbox = (-200, -100, 0, 100))
-
-    ####color menu#########
+    SCALE_GL = GridLayout(SIDEBAR[1,1], width = sidebar_width) #range scaling
+    ALL_CURVES_GL = GridLayout(SIDEBAR[2,1], width = sidebar_width) #menu to select the current curve
+    CURRENT_CURVE_GL = GridLayout(SIDEBAR[3,1], width = sidebar_width) #holds settings for the current curve
     
-    menu_container = GridLayout(sidebar[1,1])
+    CC_COLOR_GL = GridLayout(SIDEBAR[4, 1]) #shows a grid of colors
+    empty_layout = GridLayout()
+    color_option_grid = GridLayout()
+    HIDDEN_GL = GridLayout(bbox = (-200, -100, 0, 100)) #used to swap the color buttons when "hidden"
+    
+    BOTTOMBAR = GridLayout(fig[2,1], tellwidth =false, height = bottombar_height)#other stuff?
+
+    
+    
+
+    #################### SCALE / GLOBAL ##############################################################################
+
+
+    tbscale = [Textbox(fig, width = sidebar_width/3, validator = Float64) for _ in 1:4]
+    cblogx = Checkbox(fig, checked=false)
+    cblogy = Checkbox(fig, checked=false)
+    SCALE_GL[1,1] = Label(fig, "Scale")
+    SCALE_GL[2,1] = vgrid!(
+                    hgrid!(Label(fig, "X1:"), tbscale[1]),
+                    hgrid!(Label(fig, "X2:"), tbscale[2]),
+                    # hgrid!(Label(fig, "log"), cblogx),
+                    hgrid!(Label(fig, "Y1:"), tbscale[3]),
+                    hgrid!(Label(fig, "Y2:"), tbscale[4]),
+                    # hgrid!(Label(fig, "log"), cblogy),
+                                )
+
+
+    #############ALL CURVES##########################################################################################
+
+    menu_curves = Menu(fig, options = [("Curve 01", 1)],
+                        default = "Curve 01", 
+                        width = 0.5 * sidebar_width
+                        )
+    ALL_CURVES_GL[1, 1] = vgrid!(
+                        hgrid!(Label(fig, "Curve: "), menu_curves),
+    )
+
+
+    ###############CURVE##############################################################################################
+
+    tb_curve_name = Textbox(fig, placeholder = "Curve 01")
+
+    btn_add_curve = Button(fig, label = "Add")
+
+    CURRENT_CURVE_GL[1, 1] =vgrid!(
+                    Label(fig, "Current curve"),
+                    hgrid!(Label(fig, "Name"), tb_curve_name),
+                    btn_add_curve,
+    )
+
+    #####COLOR GRID
+
     btn_color = Button(fig,
                         label = "Color",
                         height = color_btn_height,
                         )
 
-    color_option_grid = GridLayout(width = sidebar_width, tellheight = false, tellwidth =false)
+    CURRENT_CURVE_GL[2,1] = btn_color
+    CC_COLOR_GL[1,1] = empty_layout
+
+    HIDDEN_GL[1,1] = color_option_grid
+    populate_dropdown(fig,
+                      color_option_grid, 
+                      cmap, 
+                      current_color, 
+                      is_colorgrid_visible; 
+                      btn_height = color_btn_height,
+                      num_color_cols,
+                      btn_width = 0.7*(sidebar_width / num_color_cols),
+                      )
+
+    
     
 
-    empty_layout = GridLayout()
-
-    tb_curve_name = Textbox(fig, placeholder = "Curve 01")
-    menu_container[1, 1] =vgrid!(
-                    Label(fig, "Current curve"),
-                    hgrid!(Label(fig, "Name"), tb_curve_name),
-                    hgrid!(btn_color, Box(fig, color = current_color, width = sidebar_width/4)),
-    )
-    menu_container[2,1] = empty_layout
-
-    scale_controls = GridLayout(sidebar[3,1], width = sidebar_width, tellheight=false)
-
-    tbscale = [Textbox(fig, width = sidebar_width/3) for _ in 1:4]
-    cblogx = Checkbox(fig, checked=false)
-    cblogy = Checkbox(fig, checked=false)
-    scale_controls[1,1] = Label(fig, "Scale")
-    scale_controls[2,1] = vgrid!(
-                    hgrid!(Label(fig, "X1:"), tbscale[1]),
-                    hgrid!(Label(fig, "X2:"), tbscale[2]),
-                    hgrid!(Label(fig, "log"), cblogx),
-                    hgrid!(Label(fig, "Y1:"), tbscale[3]),
-                    hgrid!(Label(fig, "Y2:"), tbscale[4]),
-                    hgrid!(Label(fig, "log"), cblogy),
-                                )
+    
 
     ##########################################################
+
     img_plot = image!(ax_img, ref_img)
     scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
                                 marker = Ring,
@@ -129,15 +176,23 @@ function main(;
                         )
     )
     
+
+    #############BOTTOM######################################
+
+    BOTTOMBAR[1,1] = hgrid!(
+                Label(fig, "X logscale"), cblogx, Label(fig, "Y logscale"), cblogy
+    )
+
+
     ########EVENTS###########################################
     
     on(is_colorgrid_visible) do val
         if val
-            menu_container[2, 1] = color_option_grid
-            hidden_layout[1,1] = empty_layout
+            CC_COLOR_GL[1, 1] = color_option_grid
+            HIDDEN_GL[1,1] = empty_layout
         else
-            menu_container[2, 1] = empty_layout
-            hidden_layout[1,1] = color_option_grid
+            CC_COLOR_GL[1, 1] = empty_layout
+            HIDDEN_GL[1,1] = color_option_grid
         end
     end
 
@@ -147,17 +202,59 @@ function main(;
         @info "clicked"
     end
 
+    
+
+    on(btn_add_curve.clicks) do _
+        #overwrite the selected curve entry
+        curve_id = menu_curves.i_selected
+        curve_name = tb_curve_name.stored_string
+        pts = current_curve[]
+        color = current_color[]
+
+        nt = (;name = curve_name,
+                            color,
+                            points = pts,
+                            )
+        if !isempty(ALL_CURVES) || length(ALL_CURVES)>=curve_id
+            ALL_CURVES[curve_id] = nt
+        else
+            push!(ALL_CURVES, nt)
+        end
+        #add a new curve 
+        inext= length(ALL_CURVES)+1
+        new_name = "Curve $inext"
+        pts = []
+        current_curve[] = pts
+        current_color[] = cmap[inext]
+        push!(ALL_CURVES[], (;name = new_name,
+                        color = current_color[],
+                        points= pts))
+        push!(menu_curves.options, (new_name, inext))
+        tb_curve_name.displayed_string = new_name
+        
+    end
+
+    on(tb_curve_name.stored_string) do s
+        id = menu_curves.i_selected[]
+        opts = menu_curves.options[]
+        @info "opts", opts
+        opts[id] = (s, opts[id][2])
+        menu_curves.options[] = opts
+        menu_curves.selection[] = s
+    end
 
     for (i, tb) in enumerate(tbscale)
         on(tb.stored_string) do s
             
             v = parse(Float64, s)
             plot_range[][i] = v
+            @info "plot range:", plot_range[]
         end
     end
 
     for (i, cb) in enumerate((cblogx, cblogy))
         on(cb.checked) do val
+            @info "checked"
             st = val ? :log : :linear
             scale_type[][i] = st
         end
@@ -233,19 +330,7 @@ function main(;
 
     #######################
     
-    menu_container[2,1] = empty_layout
-    hidden_layout[1,1] = color_option_grid
-
-    populate_dropdown(fig,
-                      color_option_grid, 
-                      cmap, 
-                      current_color, 
-                      is_colorgrid_visible; 
-                      btn_height = color_btn_height,
-                      num_color_cols,
-                      btn_width = 0.7*(sidebar_width / num_color_cols),
-                      )
-
+    
     
 
     return fig
