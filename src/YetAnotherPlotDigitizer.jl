@@ -22,22 +22,30 @@ function main(;
         )
 
     #######GLOBALS###########################
+    
+    Ring = BezierPath([
+            MoveTo(Point(1, 0)),
+            EllipticalArc(Point(0, 0), 1, 1, 0, 0, 2pi),
+            MoveTo(Point(0.75, 0.0)),
+            EllipticalArc(Point(0, 0), 0.75, 0.75, 0, 0, -2pi),
+            ClosePath(),
+                    ])
 
-    cmap = distinguishable_colors(num_colors, rand(RGB))
+    cmap = distinguishable_colors(num_colors, rand(RGB)) #color map for curves
 
-    current_color = Observable(first(cmap))
+    current_color = Observable(first(cmap)) 
 
     is_colorgrid_visible = Observable(false)
 
-    ref_img = Observable(nothing::Union{Nothing, Matrix})
-
+    ref_img = Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 100, 100))
+    
     current_curve = Observable(Point2f[])
     
     #to be placed by user
-    X1 = Point2f(0,0)
-    X2 = Point2f(1,0)
-    Y1 = Point2f(0.5, 0)
-    Y2 = Point2f(0.5, 1)
+    X1 = Point2f(10,10)
+    X2 = Point2f(90,10)
+    Y1 = Point2f(50, 10)
+    Y2 = Point2f(50, 90)
     scale_rect = Observable([X1, X2, Y1, Y2])
     
     
@@ -46,7 +54,8 @@ function main(;
 
     fig = Figure()
 
-    img_ax = Axis(fig[1,1], aspect = DataAspect())
+    ax_img = Axis(fig[1,1], aspect = DataAspect())
+    deregister_interaction!(ax_img, :rectanglezoom)
 
     color_grid = fig[1,2] = GridLayout(width = sidebar_width, tellheight = false)
 
@@ -69,6 +78,18 @@ function main(;
     menu_container[1, 1] = hgrid!(btn_color, Box(fig, color = current_color))
 
 
+
+    ##########################################################
+    img_plot = image!(ax_img, ref_img)
+    scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
+                                marker = Ring,
+                                markersize = 8),
+    text!(ax_img, scale_rect; text =["X1", "X2", "Y1", "Y2"],
+                        color = [:red, :red, :green, :green],
+                        fontsize = 16,
+                        offset = (5, 5)
+                        )
+    )
     
     ########EVENTS###########################################
     
@@ -85,6 +106,28 @@ function main(;
     on(btn_color.clicks) do _
         is_colorgrid_visible[] = true
     end
+
+
+    on(events(fig).dropped_files) do files
+        isempty(files) && return nothing
+        
+        f1 = first(files)
+        println(f1)
+        try
+            ref_img[] = rotr90(load(f1))
+            #  
+            reset_plot!(ax_img)
+            
+        catch e
+            @info "Triggered"
+            
+        end
+        
+    end
+
+    
+
+
     #######################
     
     menu_container[2,1] = empty_layout
@@ -149,41 +192,16 @@ function populate_dropdown(fig::Figure, grid::GridLayout,
 end
 
 
-# function create_color_menu_entries(cmap_name=:viridis::Symbol, num_entries = 10)
+function reset_plot!(ax::Axis, delete_plots= nothing::Union{Nothing, Vector{Plot}})
+
     
-#     cmap = cgrad(cmap_name, num_entries; categorical = true)
+    
+    !isnothing(delete_plots) && delete!(ax, delete_plots)
 
-#     entries = Vector{Tuple{String, eltype(cmap)}}()
-
-#     for (i, color) in enumerate(cmap)
-        
-#         label = "Color $i"
-
-#         push!(entries, (label, color))
-#     end
-#     return entries
-# end
-
-
-# function draw_color_entry(label, color)
-#     # The function returns a vector of drawables:
-#     return [
-#         # 1. A colored rectangle on the left side
-#         Rect(0.05, 0.45, 0.9, 0.6, color),
-#         # 2. The text label centered on the right side
-#         Text(label, 0.5, 0.5) 
-#     ]
-# end
-
-
-# function menu_filter_function(menu_entry, i)
-#     label, color = menu_entry
-#     return [
-#         Rect(0.05, 0.45, 0.9, 0.6, color)
-#     ]
-
-# end
-
+    
+    reset_limits!(ax)
+    
+end
 
 
 end # module YetAnotherPlotDigitizer
