@@ -122,7 +122,7 @@ function main(;
     )
 
 
-    ###############CURVE##############################################################################################
+    # ###############CURVE##############################################################################################
 
     tb_curve_name = Textbox(fig, placeholder = "Curve 01")
 
@@ -205,6 +205,8 @@ function main(;
     
 
     on(btn_add_curve.clicks) do _
+        # @info "Clicked"
+
         #overwrite the selected curve entry
         curve_id = menu_curves.i_selected
         curve_name = tb_curve_name.stored_string
@@ -281,7 +283,7 @@ function main(;
     #####################MOUSE Interaction#########################################
 
     # Interaction for pressing the mouse button
-    on(events(fig).mousebutton, priority = 10) do event
+    on(events(ax_img).mousebutton, priority = 10) do event
         # Only react to left mouse button press
         if event.button == Mouse.left && event.action == Mouse.press
             # Pick the closest control point on the scatter plot
@@ -299,7 +301,7 @@ function main(;
     end
 
     # Interaction for mouse movement (dragging)
-    on(events(fig).mouseposition, priority = 10) do mp
+    on(events(ax_img).mouseposition, priority = 10) do mp
         if dragged_index[] !== nothing && ispressed(fig, Mouse.left)
             # Convert mouse position (in pixels) to data coordinates
             
@@ -318,11 +320,11 @@ function main(;
     end
 
     # Interaction for releasing the mouse button
-    on(events(fig).mousebutton, priority = 10) do event
+    on(events(ax_img).mousebutton, priority = 10) do event
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index[] = nothing
-            return Consume(true)
+            return Consume(false) #very important
         end
         return Consume(false)
     end
@@ -335,6 +337,9 @@ function main(;
 
     return fig
 end
+
+
+
 
 
 
