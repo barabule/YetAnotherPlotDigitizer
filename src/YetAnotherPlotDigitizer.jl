@@ -53,7 +53,13 @@ function main(;
     Y1 = Point2f(50, 10)
     Y2 = Point2f(50, 90)
     scale_rect = Observable([X1, X2, Y1, Y2])
-    
+    scale_type = Observable([:linear, :linear])
+
+    #xrange, yrange
+    plot_range = Observable([0.0, 1.0, 0.0, 1.0])
+
+
+
     dragged_index = Observable{Union{Nothing, Int}}(nothing)
     #######Layout#############################
 
@@ -66,13 +72,13 @@ function main(;
     ax_img = Axis(fig[1,1], aspect = DataAspect())
     deregister_interaction!(ax_img, :rectanglezoom)
 
-    color_grid = fig[1,2] = GridLayout(width = sidebar_width, tellheight = false)
+    sidebar = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
     hidden_layout = GridLayout(bbox = (-200, -100, 0, 100))
 
     ####color menu#########
     
-    menu_container = color_grid[1,1] = GridLayout()
+    menu_container = GridLayout(sidebar[1,1])
     btn_color = Button(fig,
                         label = "Choose color",
                         height = color_btn_height,
@@ -86,20 +92,33 @@ function main(;
 
     menu_container[1, 1] = hgrid!(btn_color, Box(fig, color = current_color))
 
+    scale_controls = GridLayout(sidebar[3,1], width = sidebar_width, tellheight=false)
 
+    tbscale = [Textbox(fig, width = sidebar_width/3) for _ in 1:4]
+    cblogx = Checkbox(fig, checked=false)
+    cblogy = Checkbox(fig, checked=false)
+    scale_controls[1,1] = Label(fig, "Scale")
+    scale_controls[2,1] = vgrid!(
+                    hgrid!(Label(fig, "X1:"), tbscale[1]),
+                    hgrid!(Label(fig, "X2:"), tbscale[2]),
+                    hgrid!(Label(fig, "log"), cblogx),
+                    hgrid!(Label(fig, "Y1:"), tbscale[3]),
+                    hgrid!(Label(fig, "Y2:"), tbscale[4]),
+                    hgrid!(Label(fig, "log"), cblogy),
+                                )
 
     ##########################################################
     img_plot = image!(ax_img, ref_img)
     scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
                                 marker = Ring,
-                                markersize = 20,
+                                markersize = PICK_THRESHOLD/2,
                                 rotation = [0, 0, pi/2, pi/2]),
 
     text!(ax_img, scale_rect; text =["X1", "X2", "Y1", "Y2"],
                         color = [:red, :red, :green, :green],
                         # color = :black,
-                        fontsize = PICK_THRESHOLD,
-                        offset = (PICK_THRESHOLD, PICK_THRESHOLD)
+                        fontsize = PICK_THRESHOLD/2,
+                        offset = (PICK_THRESHOLD/2, PICK_THRESHOLD/2)
                         )
     )
     
@@ -117,6 +136,22 @@ function main(;
 
     on(btn_color.clicks) do _
         is_colorgrid_visible[] = true
+    end
+
+
+    for (i, tb) in enumerate(tbscale)
+        on(tb.stored_string) do s
+            
+            v = parse(Float64, s)
+            plot_range[][i] = v
+        end
+    end
+
+    for (i, cb) in enumerate((cblogx, cblogy))
+        on(cb.checked) do val
+            st = val ? :log : :linear
+            scale_type[][i] = st
+        end
     end
 
 
