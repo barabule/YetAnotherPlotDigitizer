@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "e706df5d42db0491e0dea5689f84403cad9c56ed"
+project_hash = "e4231f13a52d351d09a60fe3a890b067c15bb626"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1508,6 +1508,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "a63799ff68005991f9d9491b6e95bd3478d783cb"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.6.0+0"
+
+[[deps.YetAnotherPlotDigitizer]]
+deps = ["Colors", "FileIO", "GLMakie", "LinearAlgebra", "Observables", "StaticArrays"]
+path = ".."
+uuid = "e2b36d35-08f8-4606-b6fb-bb58ec6d10e6"
+version = "0.1.0"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
