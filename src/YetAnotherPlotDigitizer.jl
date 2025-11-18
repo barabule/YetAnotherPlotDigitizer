@@ -24,6 +24,7 @@ function main(;
 
     #######GLOBALS###########################
     
+    ###markers for the scaling range selection
     Ring = BezierPath([
             MoveTo(Point(1, 0)),
             EllipticalArc(Point(0, 0), 1, 1, 0, 0, 2pi),
@@ -37,17 +38,21 @@ function main(;
             ClosePath(),
                     ])
 
+    #colors
     cmap = distinguishable_colors(num_colors, rand(RGB)) #color map for curves
-
     current_color = Observable(first(cmap)) 
 
     is_colorgrid_visible = Observable(false)
 
+
+    #this is the reference image which is "digitized"
     ref_img = Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 100, 100))
     
+    #the current active curve
     current_curve = Observable(Point2f[])
-    
-    #to be placed by user
+    ALL_CURVES = Vector{Vector{Point2f}}() #holds all the curves
+
+    #scaling range markers
     X1 = Point2f(10,10)
     X2 = Point2f(90,10)
     Y1 = Point2f(50, 10)
@@ -59,18 +64,15 @@ function main(;
     plot_range = Observable([0.0, 1.0, 0.0, 1.0])
 
 
-
+    #currently dragged point (scale range or curve)
     dragged_index = Observable{Union{Nothing, Int}}(nothing)
     #######Layout#############################
 
 
     fig = Figure()
-    # inspector = fig.scene.events.inspector
-    # inspector.range[] = PICK_THRESHOLD
-
-
+    
     ax_img = Axis(fig[1,1], aspect = DataAspect())
-    deregister_interaction!(ax_img, :rectanglezoom)
+    deregister_interaction!(ax_img, :rectanglezoom) #just gets in the way when dragging
 
     sidebar = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
@@ -80,17 +82,22 @@ function main(;
     
     menu_container = GridLayout(sidebar[1,1])
     btn_color = Button(fig,
-                        label = "Choose color",
+                        label = "Color",
                         height = color_btn_height,
                         )
 
-    color_option_grid = GridLayout()
-    color_option_grid.tellheight = false
-    color_option_grid.tellwidth = false
+    color_option_grid = GridLayout(width = sidebar_width, tellheight = false, tellwidth =false)
+    
 
     empty_layout = GridLayout()
 
-    menu_container[1, 1] = hgrid!(btn_color, Box(fig, color = current_color))
+    tb_curve_name = Textbox(fig, placeholder = "Curve 01")
+    menu_container[1, 1] =vgrid!(
+                    Label(fig, "Current curve"),
+                    hgrid!(Label(fig, "Name"), tb_curve_name),
+                    hgrid!(btn_color, Box(fig, color = current_color, width = sidebar_width/4)),
+    )
+    menu_container[2,1] = empty_layout
 
     scale_controls = GridLayout(sidebar[3,1], width = sidebar_width, tellheight=false)
 
@@ -135,7 +142,9 @@ function main(;
     end
 
     on(btn_color.clicks) do _
+        @info "Before click"
         is_colorgrid_visible[] = true
+        @info "clicked"
     end
 
 
@@ -295,6 +304,27 @@ function reset_plot!(ax::Axis, delete_plots= nothing::Union{Nothing, Vector{Plot
     
     reset_limits!(ax)
     
+end
+
+
+function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) where PT
+    #simplest case where we ignore rotation and log space
+    X1, X2, Y1, Y2 = scale_rect #point2f - plot coords
+    x1, x2, y1, y2 = plot_range #scalars - target coords
+    scale_x = (x2 - x1) / (X2 - X1)
+    scale_y = (y2 - y1) / (Y2 - Y1)
+    tx = x1 - X1
+    ty = y1 - Y1
+    out = zeros(eltype(X1), length(PTS), 2)
+    for i in eachindex(PTS)
+        x, y = PTS[i]
+        x *= scale_x
+        x += tx
+        y *= scale_y
+        y += ty
+        out[i, :] = x, y
+    end
+    return out
 end
 
 
