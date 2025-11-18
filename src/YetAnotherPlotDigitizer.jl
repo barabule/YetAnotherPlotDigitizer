@@ -20,7 +20,7 @@ function main(;
         num_color_cols = 4,
         sidebar_width = 200,
         bottombar_height = 100,
-        PICK_THRESHOLD = 20,
+        PICK_THRESHOLD = 30,
         )
 
     #######GLOBALS###########################
@@ -30,13 +30,13 @@ function main(;
     Ring = BezierPath([
             MoveTo(Point(1, 0)),
             EllipticalArc(Point(0, 0), 1, 1, 0, 0, 2pi),
-            MoveTo(Point(0.75, 0.0)),
-            EllipticalArc(Point(0, 0), 0.9, 0.9, 0, 0, -2pi),
+            MoveTo(Point(0.5, 0.0)),
+            EllipticalArc(Point(0, 0), 0.5, 0.5, 0, 0, -2pi),
             ClosePath(),
-            MoveTo(0.1, 1.75),
-            LineTo(-0.1, 1.75),
-            LineTo(-0.1, -1.75),
-            LineTo(0.1, -1.75),
+            MoveTo(0.1, 2.5),
+            LineTo(-0.1, 2.5),
+            LineTo(-0.1, -2.5),
+            LineTo(0.1, -2.5),
             ClosePath(),
                     ])
 
@@ -104,10 +104,10 @@ function main(;
     SCALE_GL[2,1] = vgrid!(
                     hgrid!(Label(fig, "X1:"), tbscale[1]),
                     hgrid!(Label(fig, "X2:"), tbscale[2]),
-                    # hgrid!(Label(fig, "log"), cblogx),
+                    hgrid!(Label(fig, "log"), cblogx),
                     hgrid!(Label(fig, "Y1:"), tbscale[3]),
                     hgrid!(Label(fig, "Y2:"), tbscale[4]),
-                    # hgrid!(Label(fig, "log"), cblogy),
+                    hgrid!(Label(fig, "log"), cblogy),
                                 )
 
 
@@ -124,7 +124,7 @@ function main(;
 
     # ###############CURVE##############################################################################################
 
-    tb_curve_name = Textbox(fig, placeholder = "Curve 01")
+    tb_curve_name = Textbox(fig, placeholder = "Curve 01", width = 0.7 * sidebar_width)
 
     btn_add_curve = Button(fig, label = "Add")
 
@@ -141,7 +141,7 @@ function main(;
                         height = color_btn_height,
                         )
 
-    CURRENT_CURVE_GL[2,1] = btn_color
+    CURRENT_CURVE_GL[2,1] = hgrid!(btn_color, Box(fig, color = current_color, width = 0.4 * sidebar_width))
     CC_COLOR_GL[1,1] = empty_layout
 
     HIDDEN_GL[1,1] = color_option_grid
@@ -179,9 +179,12 @@ function main(;
 
     #############BOTTOM######################################
 
-    BOTTOMBAR[1,1] = hgrid!(
-                Label(fig, "X logscale"), cblogx, Label(fig, "Y logscale"), cblogy
-    )
+    # BOTTOMBAR[1,1] = hgrid!(
+    #             Label(fig, "X logscale"), cblogx,
+    # )
+    # BOTTOMBAR[1,2] = hgrid!(
+    #                  Label(fig, "Y logscale"), cblogy,
+    # )
 
 
     ########EVENTS###########################################
@@ -197,16 +200,15 @@ function main(;
     end
 
     on(btn_color.clicks) do _
-        @info "Before click"
+        
         is_colorgrid_visible[] = true
-        @info "clicked"
+        
     end
 
     
 
     on(btn_add_curve.clicks) do _
-        # @info "Clicked"
-
+        
         #overwrite the selected curve entry
         curve_id = menu_curves.i_selected
         curve_name = tb_curve_name.stored_string
