@@ -19,6 +19,7 @@ function main(;
         color_btn_height = 30,
         num_color_cols = 4,
         sidebar_width = 200,
+        PICK_THRESHOLD = 20,
         )
 
     #######GLOBALS###########################
@@ -27,7 +28,12 @@ function main(;
             MoveTo(Point(1, 0)),
             EllipticalArc(Point(0, 0), 1, 1, 0, 0, 2pi),
             MoveTo(Point(0.75, 0.0)),
-            EllipticalArc(Point(0, 0), 0.75, 0.75, 0, 0, -2pi),
+            EllipticalArc(Point(0, 0), 0.9, 0.9, 0, 0, -2pi),
+            ClosePath(),
+            MoveTo(0.1, 1.75),
+            LineTo(-0.1, 1.75),
+            LineTo(-0.1, -1.75),
+            LineTo(0.1, -1.75),
             ClosePath(),
                     ])
 
@@ -48,11 +54,14 @@ function main(;
     Y2 = Point2f(50, 90)
     scale_rect = Observable([X1, X2, Y1, Y2])
     
-    
+    dragged_index = Observable{Union{Nothing, Int}}(nothing)
     #######Layout#############################
 
 
     fig = Figure()
+    # inspector = fig.scene.events.inspector
+    # inspector.range[] = PICK_THRESHOLD
+
 
     ax_img = Axis(fig[1,1], aspect = DataAspect())
     deregister_interaction!(ax_img, :rectanglezoom)
@@ -83,11 +92,14 @@ function main(;
     img_plot = image!(ax_img, ref_img)
     scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
                                 marker = Ring,
-                                markersize = 8),
+                                markersize = 20,
+                                rotation = [0, 0, pi/2, pi/2]),
+
     text!(ax_img, scale_rect; text =["X1", "X2", "Y1", "Y2"],
                         color = [:red, :red, :green, :green],
-                        fontsize = 16,
-                        offset = (5, 5)
+                        # color = :black,
+                        fontsize = PICK_THRESHOLD,
+                        offset = (PICK_THRESHOLD, PICK_THRESHOLD)
                         )
     )
     
@@ -125,7 +137,54 @@ function main(;
         
     end
 
-    
+    #####################MOUSE Interaction#########################################
+
+    # Interaction for pressing the mouse button
+    on(events(fig).mousebutton, priority = 10) do event
+        # Only react to left mouse button press
+        if event.button == Mouse.left && event.action == Mouse.press
+            # Pick the closest control point on the scatter plot
+            # `pick` returns the plot object and the index of the picked element
+            plot, index = pick(ax_img.scene, events(ax_img).mouseposition[], PICK_THRESHOLD)
+            # @info plot
+            # Check if a control point was picked
+            if plot === scaling_pts[1] && index !== nothing
+                dragged_index[] = index
+                # Consume the event so the default interaction (e.g., pan) doesn't run
+                return Consume(true) 
+            end
+        end
+        return Consume(false)
+    end
+
+    # Interaction for mouse movement (dragging)
+    on(events(fig).mouseposition, priority = 10) do mp
+        if dragged_index[] !== nothing && ispressed(fig, Mouse.left)
+            # Convert mouse position (in pixels) to data coordinates
+            
+            # dragged_index[] == 1 && return Consume(true) #fixed 1st point
+            new_data_pos = Makie.mouseposition(ax_img.scene)
+            
+            # Update the specific control point's position
+            current_points = scale_rect[]
+            current_points[dragged_index[]] = new_data_pos
+            scale_rect[] = current_points # Notify the Observable of the change
+            
+            # Consume the event to prevent other interactions from running
+            return Consume(true)
+        end
+        return Consume(false)
+    end
+
+    # Interaction for releasing the mouse button
+    on(events(fig).mousebutton, priority = 10) do event
+        if event.button == Mouse.left && event.action == Mouse.release
+            # Stop dragging
+            dragged_index[] = nothing
+            return Consume(true)
+        end
+        return Consume(false)
+    end
 
 
     #######################
