@@ -9,7 +9,7 @@ using FileIO
 using Colors
 
 
-# include("bezier.jl")
+include("bezier.jl")
 
 
 export main
@@ -48,27 +48,40 @@ function main(;
 
 
     #this is the reference image which is "digitized"
-    ref_img = Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 100, 100))
+    ref_img = Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480))
     
-    #the current active curve
-    current_curve = Observable(Point2f[])
-    ALL_CURVES = Vector{Any}() #holds all the curves
+    
 
     #scaling range markers
-    X1 = Point2f(10,10)
-    X2 = Point2f(90,10)
-    Y1 = Point2f(50, 10)
-    Y2 = Point2f(50, 90)
+    sz = size(ref_img[])
+    X1 = Point2f(0.1 * sz[1], 0.1 * sz[2])
+    X2 = Point2f(0.9 * sz[1], 0.1 * sz[2])
+    Y1 = Point2f(0.5 * sz[1], 0.1 * sz[2])
+    Y2 = Point2f(0.5 * sz[1], 0.9 * sz[2])
     scale_rect = Observable([X1, X2, Y1, Y2])
     scale_type = Observable([:linear, :linear])
 
-    #xrange, yrange
-    plot_range = Observable([0.0, 1.0, 0.0, 1.0])
+    
+    C1  = Point2f(0.2 * X1[1], 0.2 * Y1[2])
+    C11 = Point2f(0.4 * X1[1], 0.6 * Y1[2])
+    C2  = Point2f(0.8 * X2[1], 0.8 * Y2[2])
+    C22 = Point2f(0.6 * X2[1], 0.8 * Y2[2])
+
+    current_curve = Observable([C1, C11, C22, C2])#the current active curve
+    ALL_CURVES = [current_curve] #holds all the curves
+
+    plot_range = Observable([0.0, 1.0, 0.0, 1.0]) #scaling ranges x1, x2, y1, y2
 
 
     #currently dragged point (scale range or curve)
     dragged_index = Observable{Union{Nothing, Int}}(nothing)
 
+    #the fitting curve
+    bezier_curve = lift(current_curve) do pts
+        curve = piecewise_cubic_bezier(pts)
+    end
+
+    dragging_curve = Observable(false)
 
     #######LAYOUT#############################
 
@@ -92,8 +105,17 @@ function main(;
     BOTTOMBAR = GridLayout(fig[2,1], tellwidth =false, height = bottombar_height)#other stuff?
 
     
-    
+    label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one.",
+                    fontsize= 16,
+                    color = :grey10,
+                    halign =:center,
+                    valign = :top,
+                    padding = (10, 0, 0, 10),
+                    tellwidth = false,
+                    )
+    fig[0,1] = label_help
 
+    
     #################### SCALE / GLOBAL ##############################################################################
 
 
@@ -155,12 +177,8 @@ function main(;
                       btn_width = 0.7*(sidebar_width / num_color_cols),
                       )
 
-    
-    
 
-    
-
-    ##########################################################
+    ########################PLOTS#######################################################################################
 
     img_plot = image!(ax_img, ref_img)
     scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
@@ -176,6 +194,20 @@ function main(;
                         )
     )
     
+    lines!(ax_img, bezier_curve, color = :black, linewidth = 4, label = "Curve 01")# final Bézier curve
+
+    
+    lines!(ax_img, current_curve, color = (:grey, 0.5), linestyle = :dash)
+
+    #control pts
+    ctrl_scatter = scatter!(ax_img, current_curve, 
+                        markersize = PICK_THRESHOLD, 
+                        color = :red, 
+                        strokecolor = :black, 
+                        strokewidth = 1, 
+                        marker = :circle, 
+                        )
+
 
     #############BOTTOM######################################
 
@@ -293,10 +325,13 @@ function main(;
             plot, index = pick(ax_img.scene, events(ax_img).mouseposition[], PICK_THRESHOLD)
             # @info plot
             # Check if a control point was picked
-            if plot === scaling_pts[1] && index !== nothing
+            if plot === scaling_pts[1]  && !isnothing(index)
                 dragged_index[] = index
                 # Consume the event so the default interaction (e.g., pan) doesn't run
                 return Consume(true) 
+            elseif  plot === ctrl_scatter && !isnothing(index)
+                dragging_curve[] = true
+                return Consume(true)
             end
         end
         return Consume(false)
@@ -310,10 +345,15 @@ function main(;
             # dragged_index[] == 1 && return Consume(true) #fixed 1st point
             new_data_pos = Makie.mouseposition(ax_img.scene)
             
-            # Update the specific control point's position
-            current_points = scale_rect[]
-            current_points[dragged_index[]] = new_data_pos
-            scale_rect[] = current_points # Notify the Observable of the change
+            if dragging_curve[]
+                current_points = scale_rect[]
+                current_points[dragged_index[]] = new_data_pos
+                scale_rect[] = current_points # Notify the Observable of the change
+            else #bezier drag
+                current_points = current_curve[]
+                move_control_vertices!(current_points, dragged_index[], new_data_pos)
+                current_curve[] = current_points # Notify the Observable of the change
+            end
             
             # Consume the event to prevent other interactions from running
             return Consume(true)
@@ -326,7 +366,32 @@ function main(;
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index[] = nothing
+            dragging_curve[] = false
             return Consume(false) #very important
+        end
+        return Consume(false)
+    end
+
+
+    on(events(ax_img).keyboardbutton, priority = 10) do event
+        if event.action == Keyboard.press
+            current_points = current_curve[]
+            
+            if event.key == Keyboard.a # Add point
+                # Check if we have a valid mouse position in data coordinates
+                data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+                
+                add_bezier_segment!(current_points, data_pos)
+                # @info "current_points",current_points
+                current_curve[] = current_points
+                return Consume(true)
+            
+            elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
+                data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+                remove_bezier_segment!(current_points, data_pos)
+                current_curve[] = current_points
+            end
+            
         end
         return Consume(false)
     end
@@ -367,7 +432,7 @@ function populate_dropdown(fig::Figure, grid::GridLayout,
         # Create a Button for each entry
         btn = grid[j, k] = Button(fig, 
             label = "", #no label
-            # Customize the appearance with a colored Box
+            
             buttoncolor = entry, 
             height = btn_height,
             width = btn_width,
