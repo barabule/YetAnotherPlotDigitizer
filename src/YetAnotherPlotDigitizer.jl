@@ -17,12 +17,12 @@ include("bezier.jl")
 export main
 
 function main(;
-        num_colors = 8,
+        num_colors = 32,
         color_btn_height = 30,
         num_color_cols = 4,
         sidebar_width = 200,
         bottombar_height = 100,
-        PICK_THRESHOLD = 30,
+        PICK_THRESHOLD = 20,
         )
 
     #######GLOBALS###########################
@@ -73,29 +73,23 @@ function main(;
     plot_range = Observable([0.0, 1.0, 0.0, 1.0]) #scaling ranges x1, x2, y1, y2
 
 
-    #currently dragged point (scale range or curve)
-    
-
-    #the fitting curve
+    #hi res sampling of the current curve
     bezier_curve = lift(current_curve) do pts
-        curve = piecewise_cubic_bezier(pts)
+        curve = piecewise_cubic_bezier(pts; N_segments = 50)
     end
 
-    dragging_curve = Observable(false)
 
     # Variables to store the state during a drag operation
-    drag_start_pos = Point2f(0, 0)
-    dragged_index = -1
+    dragged_index = -1 #index to the closest vertex
     target_observable = nothing # ctrl_scatter or scal
 
-    # Get the observable for the Mouse.leftdrag event on the axis's scene
-    
-    previous_curve_id = Observable(1)
-
+    edited_curve_id = Observable(1)
 
     num_export = Observable(100) #how many points per curve to export
     export_folder = nothing
-    #######LAYOUT#############################
+
+
+    #######LAYOUT#######################################################################################################
 
 
     fig = Figure()
@@ -128,7 +122,7 @@ function main(;
     fig[0,1] = label_help
 
     
-    #################### SCALE / GLOBAL ##############################################################################
+    #################### SCALE / GLOBAL ################################################################################
 
 
     tbscale = [Textbox(fig, width = sidebar_width/3, validator = Float64) for _ in 1:4]
@@ -145,7 +139,7 @@ function main(;
                                 )
 
 
-    #############ALL CURVES##########################################################################################
+    #############ALL CURVES#############################################################################################
 
     menu_curves = Menu(fig, options = [("Curve 01", 1)],
                         default = "Curve 01", 
@@ -284,12 +278,12 @@ function main(;
     end
 
     on(menu_curves.selection) do s
-        if previous_curve_id[] == s || isnothing(s)
+        if edited_curve_id[] == s || isnothing(s)
             return nothing
         end
         
         
-        previous_curve_id[] = s
+        edited_curve_id[] = s
         #put the new data in
         # @info "s", s
         cdata = ALL_CURVES[s]
@@ -315,7 +309,7 @@ function main(;
 
     on(current_color) do c
         
-        update_curve!(ALL_CURVES, previous_curve_id[]; color= c)
+        update_curve!(ALL_CURVES, edited_curve_id[]; color= c)
     end
 
     for (i, tb) in enumerate(tbscale)
@@ -352,9 +346,9 @@ function main(;
             current_curve[] = get_initial_curve_pts(scale_rect[])
             menu_curves.options[] = [("Curve 01", 1)]
             tb_curve_name.placeholder = "Curve 01"
-            previous_curve_id[] = 1
+            edited_curve_id[] = 1
         catch e
-            @info "Triggered"
+            @info "Probably not an image?"
             
         end
         
@@ -441,7 +435,7 @@ function main(;
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index = -1
-            update_curve!(ALL_CURVES, previous_curve_id[]; points = current_curve[])
+            update_curve!(ALL_CURVES, edited_curve_id[]; points = current_curve[])
         end
         return Consume(false)
     end
@@ -483,7 +477,7 @@ end
 
 
 
-
+# create for each color a button and behavior
 function populate_dropdown(fig::Figure, grid::GridLayout, 
                             colormap_entries, 
                             current_color::Observable, 
