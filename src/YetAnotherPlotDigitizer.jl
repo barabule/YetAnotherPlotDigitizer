@@ -344,9 +344,15 @@ function main(;
         println(f1)
         try
             ref_img[] = rotr90(load(f1))
-            #  
-            reset_plot!(ax_img)
-            
+            #reset most state 
+            if length(ALL_CURVES)>=2 #drop all but the 1st curve
+                deleteat!(ALL_CURVES, 2:length(ALL_CURVES))
+            end
+            ALL_CURVES[1] =ntinit #put the initial simple curve into the 1st slot
+            current_curve[] = get_initial_curve_pts(scale_rect[])
+            menu_curves.options[] = [("Curve 01", 1)]
+            tb_curve_name.placeholder = "Curve 01"
+            previous_curve_id[] = 1
         catch e
             @info "Triggered"
             
