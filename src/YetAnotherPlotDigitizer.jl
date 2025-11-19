@@ -212,9 +212,12 @@ function main(;
     lines!(ax_img, current_curve, color = (:grey, 0.5), linestyle = :dash)
 
     #control pts
+    
+    
+    ctlr_colors = @lift map(i -> is_main_vertex($current_curve, i) ? :blue : :red, eachindex($current_curve))
     ctrl_scatter = scatter!(ax_img, current_curve, 
                         markersize = PICK_THRESHOLD, 
-                        color = :red, 
+                        color = ctlr_colors, 
                         strokecolor = :black, 
                         strokewidth = 1, 
                         marker = :circle, 
