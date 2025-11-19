@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 module YetAnotherPlotDigitizer
 
 using GLMakie
@@ -522,26 +524,30 @@ function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) wher
 end
 
 
-end # module YetAnotherPlotDigitizer
 
 
 function find_closest_point_to_position(pts, pos; 
-                    PICK_THRESHOLD = 20,
-                    area = :circle, #:circle or :square
-                    )
+                                    PICK_THRESHOLD = 20,
+                                    area = :circle, #:circle or :square
+                                    )
     index = -1
+    dmin = Inf
+
     if area == :circle
         dist = (p1, p2) -> norm(p1 .- p2)
     elseif area ==:square
-        dist = (p1, p2) -> max(abs.(p1 .- p2)...)
+        dist = (p1, p2) -> norm(p1 .- p2, Inf)
     end
+
     
     for (i, pt) in enumerate(pts)
         d = dist(pt, pos)
-        if d <= PICK_THRESHOLD
-            return (i)
+        if d <= PICK_THRESHOLD && d<dmin 
+            dmin = d
+            index = i   
         end
     end
+    
     return index
 end
 
@@ -557,3 +563,9 @@ function get_initial_curve_pts(PTS)
     return [C1, C2, C3, C4]
 
 end
+
+
+
+
+
+end # module YetAnotherPlotDigitizer
