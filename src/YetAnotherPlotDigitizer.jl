@@ -90,7 +90,11 @@ function main(;
 
     # Get the observable for the Mouse.leftdrag event on the axis's scene
     
-    previous_curve_id = 1
+    previous_curve_id = Observable(1)
+
+
+    num_export = Observable(100) #how many points per curve to export
+    export_folder = nothing
     #######LAYOUT#############################
 
 
@@ -220,12 +224,22 @@ function main(;
 
     #############BOTTOM######################################
 
-    # BOTTOMBAR[1,1] = hgrid!(
-    #             Label(fig, "X logscale"), cblogx,
-    # )
-    # BOTTOMBAR[1,2] = hgrid!(
-    #                  Label(fig, "Y logscale"), cblogy,
-    # )
+    btn_export = Button(fig, label="Export", width = 50)
+
+    menu_export = Menu(fig, 
+                        options = [("CSV", :csv), 
+                                    ("TXT", :txt)],
+                        default = "CSV",
+                        width = 80,
+                        )
+
+
+    tb_export_num = Textbox(fig, placeholder = "100", validator = Int)
+
+    BOTTOMBAR[1,1] = vgrid!(
+                    hgrid!(Label("Points to export: "), tb_export_num),
+                    hgrid!(btn_export, menu_export),
+                            )           
 
 
     ########EVENTS###########################################
@@ -250,25 +264,7 @@ function main(;
 
     on(btn_add_curve.clicks) do _
         
-        #overwrite the selected curve entry
-        curve_id = menu_curves.i_selected[]
-        curve_name = tb_curve_name.stored_string[]
-        if isnothing(curve_name)
-            curve_name = "Curve 01"
-        end
-        pts = current_curve[]
-        color = current_color[]
-
-        nt = (;name = curve_name,
-                            color,
-                            points = pts,
-                            )
-        if !isempty(ALL_CURVES) || length(ALL_CURVES)>=curve_id
-            ALL_CURVES[curve_id] = nt
-        else
-            push!(ALL_CURVES, nt)
-        end
-        #add a new curve 
+        #just add a new curve 
         inext= length(ALL_CURVES)+1
         new_name = "Curve $inext"
         pts = get_initial_curve_pts(scale_rect[])
@@ -281,34 +277,42 @@ function main(;
         push!(opts, (new_name, inext))
         menu_curves.options[] = opts
         tb_curve_name.displayed_string = new_name
-        
+        menu_curves.i_selected[] = inext
     end
 
     on(menu_curves.selection) do s
-        if previous_curve_id == menu_curves.i_selected[]
+        if previous_curve_id[] == s || isnothing(s)
             return nothing
         end
-        #collect the current curve data
-        cdata = (;name = tb_curve_name.stored_string[],
-                color = current_color[],
-                points = current_curve[])
-        ALL_CURVES[previous_curve_id] = cdata
-        previous_curve_id = menu_curves.i_selected[]
+        
+        
+        previous_curve_id[] = s
         #put the new data in
-        cdata = ALL_CURVES[previous_curve_id]
+        @info "s", s
+        cdata = ALL_CURVES[s]
 
         tb_curve_name.stored_string[] = cdata.name
         current_color[] = cdata.color
         current_curve[] = cdata.points
     end
 
+    
+
     on(tb_curve_name.stored_string) do s
-        id = menu_curves.i_selected[]
+        id = menu_curves.selection[]
+        
+        update_curve!(ALL_CURVES, id; name = s)
+        #also update the menu entry
         opts = menu_curves.options[]
-        @info "opts", opts
+        # @info "opts", opts
         opts[id] = (s, opts[id][2])
         menu_curves.options[] = opts
-        menu_curves.selection[] = s
+        
+    end
+
+    on(current_color) do c
+        
+        update_curve!(ALL_CURVES, previous_curve_id[]; color= c)
     end
 
     for (i, tb) in enumerate(tbscale)
@@ -333,6 +337,7 @@ function main(;
         isempty(files) && return nothing
         
         f1 = first(files)
+        export_folder = dirname(f1)
         println(f1)
         try
             ref_img[] = rotr90(load(f1))
@@ -346,6 +351,19 @@ function main(;
         
     end
 
+
+    on(tb_export_num.stored_string) do s
+        n = 10
+        try n = parse(Int, s); catch; end
+        num_export[] = min(10, n)
+    end
+
+    on(btn_export.clicks) do _
+        N = num_export[]
+        format = menu_export.selection[]
+        export_curves(ALL_CURVES; N, format, export_folder)
+
+    end
     #####################MOUSE Interaction#########################################
 
     
@@ -406,7 +424,7 @@ function main(;
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index = -1
-            
+            update_curve!(ALL_CURVES, previous_curve_id[]; points = current_curve[])
         end
         return Consume(false)
     end
@@ -565,7 +583,55 @@ function get_initial_curve_pts(PTS)
 end
 
 
+function update_curve!(CRV, id; name = nothing,
+                        color = nothing,
+                        points = nothing)
 
+    @assert 0 < id <= length(CRV)
+    nt = CRV[id]
+    name = isnothing(name) ? nt.name : name
+    color = isnothing(color) ? nt.color : color
+    points = isnothing(points) ? nt.points : points
+    
+    @assert typeof(name) == typeof(nt.name)
+    @assert typeof(color) == typeof(nt.color)
+    @assert typeof(points) == typeof(nt.points)
+    
+    CRV[id] = (;name, color, points)
+
+end
+
+function export_curves(ALL_CURVES; 
+                    N = 100, 
+                    format = :csv, 
+                    export_folder = nothing::Union{Nothing, String})
+
+
+    if format==:csv
+        ext = ".csv"
+        delim = ','
+    elseif format == :txt
+        ext = ".txt"
+        delim = ','
+    end
+
+    for crv in ALL_CURVES
+        if isnothing(export_folder)
+            fn = crv.name * ext
+        else
+            fn = joinpath(export_folder, crv.name * ext)
+        end
+        data = resample_curve(crv.pts, N)
+        writedlm(fn, data, delim)
+    end
+    return nothing
+end
+
+
+function resample_curve(crv, N=100)
+    
+
+end
 
 
 end # module YetAnotherPlotDigitizer
