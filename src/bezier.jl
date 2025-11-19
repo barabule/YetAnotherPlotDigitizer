@@ -37,7 +37,7 @@ function piecewise_cubic_bezier(control_points::Vector{PT};
                                 ) where PT
 
     @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
-    
+
     curve_points = PT[]
     n_points = length(control_points)
 
@@ -78,11 +78,11 @@ end
 Simple accumulation of linear segments.
 Return a tuple (t, L) of t values and their corresponding arc lengths.
 """
-function sample_arc_length(segment::Vector{PT}; samples = 100) where PT
+function sample_arc_length(segment::AbstractVector{PT}; samples_per_segment = 100) where PT
     #returns a tuple of t values and their corresponding arc length
     T = eltype(first(segment))
     @assert length(segment) == 4 "Cubic segment must have 4 control points"
-    ti = LinRange(0, 1, samples)
+    ti = LinRange(0, 1, samples_per_segment)
     L = zeros(T, size(ti))
     P_prev = first(segment)
     for (i, t) in enumerate(ti) 
@@ -123,27 +123,31 @@ function create_arc_length_lut(control_points::Vector{PT}; samples_per_segment=5
 end
 
 
-function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100; lut_samples = 20) where PT
+function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100, lut_samples = 20) where PT
     @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
     
     LUT,total_arc_length = create_arc_length_lut(control_points; samples_per_segment = lut_samples)
      
-    idx_main_pts = filter(1 -> is_main_vertex(control_points, i), 1:length(control_points))
+    idx_main_pts = filter(i -> is_main_vertex(control_points, i), 1:length(control_points))
     num_segments = length(idx_main_pts) - 1
 
     l_samples = LinRange(0, total_arc_length, samples)
     PTS = [first(control_points)]
     for (i, len) in enumerate(l_samples)
         i==1 && continue
-        i == lut_samples && push!(PTS, last(control_points))
+        if i == samples  
+            push!(PTS, last(control_points))  
+            break
+        end
 
-        idx = findfirst(l -> l > len, LUT.length) #lookup
+        idx = findfirst(l -> l >= len, LUT.length) #lookup
         #linear interpolate on the previous segment
         l1, l2 = LUT.length[idx-1], LUT.length[idx]
-        t = (l2-len) / (l2 - l1) 
+        t = (len - l1) / (l2 - l1) 
         idseg = LUT.index[idx]
-        i1, i2 = idx_main_pts[idseg], idx_main_pts[idxseg+1]
+        i1, i2 = idx_main_pts[idseg], idx_main_pts[idseg+1]
         CP = view(control_points, i1:i2)
+        t1, t2 = LUT.tval[idx-1], LUT.tval[idx]
         P1 = cubic_bezier_point(t1, CP...)
         P2 = cubic_bezier_point(t2, CP...)
         push!(PTS, (1-t)* P1 + t * P2)

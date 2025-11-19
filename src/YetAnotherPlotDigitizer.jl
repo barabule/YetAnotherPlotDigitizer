@@ -9,7 +9,7 @@ using StaticArrays
 using Observables
 using FileIO
 using Colors
-
+using DelimitedFiles
 
 include("bezier.jl")
 
@@ -237,7 +237,7 @@ function main(;
     tb_export_num = Textbox(fig, placeholder = "100", validator = Int)
 
     BOTTOMBAR[1,1] = vgrid!(
-                    hgrid!(Label("Points to export: "), tb_export_num),
+                    hgrid!(Label(fig, "Points to export: "), tb_export_num),
                     hgrid!(btn_export, menu_export),
                             )           
 
@@ -355,13 +355,21 @@ function main(;
     on(tb_export_num.stored_string) do s
         n = 10
         try n = parse(Int, s); catch; end
-        num_export[] = min(10, n)
+        num_export[] = max(10, n)
     end
 
     on(btn_export.clicks) do _
         N = num_export[]
         format = menu_export.selection[]
-        export_curves(ALL_CURVES; N, format, export_folder)
+       
+        export_curves(ALL_CURVES, 
+                    scale_rect[], 
+                    plot_range[], 
+                    scale_type[];
+                    N, 
+                    format, 
+                    export_folder,
+                    )
 
     end
     #####################MOUSE Interaction#########################################
@@ -521,25 +529,7 @@ function reset_plot!(ax::Axis, delete_plots= nothing::Union{Nothing, Vector{Plot
 end
 
 
-function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) where PT
-    #simplest case where we ignore rotation and log space
-    X1, X2, Y1, Y2 = scale_rect #point2f - plot coords
-    x1, x2, y1, y2 = plot_range #scalars - target coords
-    scale_x = (x2 - x1) / (X2 - X1)
-    scale_y = (y2 - y1) / (Y2 - Y1)
-    tx = x1 - X1
-    ty = y1 - Y1
-    out = zeros(eltype(X1), length(PTS), 2)
-    for i in eachindex(PTS)
-        x, y = PTS[i]
-        x *= scale_x
-        x += tx
-        y *= scale_y
-        y += ty
-        out[i, :] = x, y
-    end
-    return out
-end
+
 
 
 
@@ -601,7 +591,7 @@ function update_curve!(CRV, id; name = nothing,
 
 end
 
-function export_curves(ALL_CURVES; 
+function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type; 
                     N = 100, 
                     format = :csv, 
                     export_folder = nothing::Union{Nothing, String})
@@ -621,13 +611,35 @@ function export_curves(ALL_CURVES;
         else
             fn = joinpath(export_folder, crv.name * ext)
         end
-        data = sample_cubic_bezier_curve(crv.pts; samples = N)
-        writedlm(fn, data, delim)
+        data = sample_cubic_bezier_curve(crv.points; samples = N, lut_samples = 200)
+        #needs to be transformed
+        tdata = transform_pts(data, scale_rect, plot_range, scale_type)
+        writedlm(fn, tdata, delim)
+        @info "Exported", fn
     end
+    
     return nothing
 end
 
-
+function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) where PT
+    #simplest case where we ignore rotation and log space
+    X1, X2, Y1, Y2 = scale_rect #point2f - plot coords
+    x1, x2, y1, y2 = plot_range #scalars - target coords
+    scale_x = (x2 - x1) / (X2[1] - X1[1])
+    scale_y = (y2 - y1) / (Y2[2] - Y1[2])
+    tX = -X1[1]
+    tY = -Y1[2]
+    tx = x1 
+    ty = y1 
+    out = zeros(eltype(X1), length(PTS), 2)
+    for i in eachindex(PTS)
+        x, y = PTS[i]
+        x = (x + tX) * scale_x + tx
+        y = (y + tY) * scale_y + ty
+        out[i, :] .= x, y
+    end
+    return out
+end
 
 
 

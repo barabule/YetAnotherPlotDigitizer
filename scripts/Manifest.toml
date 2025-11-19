@@ -234,6 +234,12 @@ git-tree-sha1 = "783b21581a051ac91a3921ee37e26a23ed7f57a6"
 uuid = "927a84f5-c5f4-47a5-9785-b46e178433df"
 version = "1.6.5"
 
+[[deps.DelimitedFiles]]
+deps = ["Mmap"]
+git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
+uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+version = "1.9.1"
+
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -576,18 +582,16 @@ version = "1.0.2"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[deps.IntervalSets]]
-git-tree-sha1 = "03b4f40b4987baa6a653a21f6f33f902af6255f3"
+git-tree-sha1 = "d966f85b3b7a8e49d034d27a189e9a4874b4391a"
 uuid = "8197267c-284f-5f27-9208-e0e47529a953"
-version = "0.7.12"
+version = "0.7.13"
 
     [deps.IntervalSets.extensions]
-    IntervalSetsPrintfExt = "Printf"
     IntervalSetsRandomExt = "Random"
     IntervalSetsRecipesBaseExt = "RecipesBase"
     IntervalSetsStatisticsExt = "Statistics"
 
     [deps.IntervalSets.weakdeps]
-    Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
     Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
     RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
     Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -1510,7 +1514,7 @@ uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.6.0+0"
 
 [[deps.YetAnotherPlotDigitizer]]
-deps = ["Colors", "FileIO", "GLMakie", "LinearAlgebra", "Observables", "StaticArrays"]
+deps = ["Colors", "DelimitedFiles", "FileIO", "GLMakie", "LinearAlgebra", "Observables", "StaticArrays"]
 path = ".."
 uuid = "e2b36d35-08f8-4606-b6fb-bb58ec6d10e6"
 version = "0.1.0"
