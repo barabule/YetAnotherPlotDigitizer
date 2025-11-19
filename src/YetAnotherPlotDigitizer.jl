@@ -62,19 +62,17 @@ function main(;
     scale_type = Observable([:linear, :linear])
 
     
-    C1  = Point2f(0.2 * X1[1], 0.2 * Y1[2])
-    C11 = Point2f(0.4 * X1[1], 0.6 * Y1[2])
-    C2  = Point2f(0.8 * X2[1], 0.8 * Y2[2])
-    C22 = Point2f(0.6 * X2[1], 0.8 * Y2[2])
+    
 
-    current_curve = Observable([C1, C11, C22, C2])#the current active curve
-    ALL_CURVES = [current_curve] #holds all the curves
+    current_curve = Observable(get_initial_curve_pts(scale_rect[]))#the current active curve
+    ntinit = (;name= "Curve 01", color = current_color[], points = current_curve[])
+    ALL_CURVES = [ntinit] #holds all the curves
 
     plot_range = Observable([0.0, 1.0, 0.0, 1.0]) #scaling ranges x1, x2, y1, y2
 
 
     #currently dragged point (scale range or curve)
-    dragged_index = Observable{Union{Nothing, Int}}(nothing)
+    
 
     #the fitting curve
     bezier_curve = lift(current_curve) do pts
@@ -83,6 +81,14 @@ function main(;
 
     dragging_curve = Observable(false)
 
+    # Variables to store the state during a drag operation
+    drag_start_pos = Point2f(0, 0)
+    dragged_index = -1
+    target_observable = nothing # ctrl_scatter or scal
+
+    # Get the observable for the Mouse.leftdrag event on the axis's scene
+    
+    previous_curve_id = 1
     #######LAYOUT#############################
 
 
@@ -194,7 +200,7 @@ function main(;
                         )
     )
     
-    lines!(ax_img, bezier_curve, color = :black, linewidth = 4, label = "Curve 01")# final Bézier curve
+    lines!(ax_img, bezier_curve, color = current_color, linewidth = 4, label = "Curve 01")# final Bézier curve
 
     
     lines!(ax_img, current_curve, color = (:grey, 0.5), linestyle = :dash)
@@ -208,6 +214,7 @@ function main(;
                         marker = :circle, 
                         )
 
+    
 
     #############BOTTOM######################################
 
@@ -242,8 +249,11 @@ function main(;
     on(btn_add_curve.clicks) do _
         
         #overwrite the selected curve entry
-        curve_id = menu_curves.i_selected
-        curve_name = tb_curve_name.stored_string
+        curve_id = menu_curves.i_selected[]
+        curve_name = tb_curve_name.stored_string[]
+        if isnothing(curve_name)
+            curve_name = "Curve 01"
+        end
         pts = current_curve[]
         color = current_color[]
 
@@ -259,15 +269,35 @@ function main(;
         #add a new curve 
         inext= length(ALL_CURVES)+1
         new_name = "Curve $inext"
-        pts = []
+        pts = get_initial_curve_pts(scale_rect[])
         current_curve[] = pts
         current_color[] = cmap[inext]
-        push!(ALL_CURVES[], (;name = new_name,
+        push!(ALL_CURVES, (;name = new_name,
                         color = current_color[],
                         points= pts))
-        push!(menu_curves.options, (new_name, inext))
+        opts = menu_curves.options[]
+        push!(opts, (new_name, inext))
+        menu_curves.options[] = opts
         tb_curve_name.displayed_string = new_name
         
+    end
+
+    on(menu_curves.selection) do s
+        if previous_curve_id == menu_curves.i_selected[]
+            return nothing
+        end
+        #collect the current curve data
+        cdata = (;name = tb_curve_name.stored_string[],
+                color = current_color[],
+                points = current_curve[])
+        ALL_CURVES[previous_curve_id] = cdata
+        previous_curve_id = menu_curves.i_selected[]
+        #put the new data in
+        cdata = ALL_CURVES[previous_curve_id]
+
+        tb_curve_name.stored_string[] = cdata.name
+        current_color[] = cdata.color
+        current_curve[] = cdata.points
     end
 
     on(tb_curve_name.stored_string) do s
@@ -316,47 +346,55 @@ function main(;
 
     #####################MOUSE Interaction#########################################
 
-    # Interaction for pressing the mouse button
-    on(events(ax_img).mousebutton, priority = 10) do event
+    
+    
+    on(events(ax_img.scene).mousebutton, priority = 20) do event
         # Only react to left mouse button press
         if event.button == Mouse.left && event.action == Mouse.press
-            # Pick the closest control point on the scatter plot
-            # `pick` returns the plot object and the index of the picked element
-            plot, index = pick(ax_img.scene, events(ax_img).mouseposition[], PICK_THRESHOLD)
-            # @info plot
-            # Check if a control point was picked
-            if plot === scaling_pts[1]  && !isnothing(index)
-                dragged_index[] = index
-                # Consume the event so the default interaction (e.g., pan) doesn't run
-                return Consume(true) 
-            elseif  plot === ctrl_scatter && !isnothing(index)
-                dragging_curve[] = true
+            @info "triggered mouse press"
+            mousepos = Makie.mouseposition(ax_img.scene)
+            dragged_index = -1
+            target_observable = nothing
+            
+            #try the scaling pts
+            idx = find_closest_point_to_position(scale_rect[], mousepos; PICK_THRESHOLD, area= :square)
+            if idx !=-1
+                 target_observable = scaling_pts
+                 dragged_index = idx
+                 return Consume(true)   
+            end
+            
+            idx = find_closest_point_to_position(current_curve[], mousepos; PICK_THRESHOLD, area= :square)
+            if idx != -1
+                target_observable = ctrl_scatter
+                dragged_index = idx
                 return Consume(true)
             end
+
         end
         return Consume(false)
     end
 
     # Interaction for mouse movement (dragging)
     on(events(ax_img).mouseposition, priority = 10) do mp
-        if dragged_index[] !== nothing && ispressed(fig, Mouse.left)
+        if dragged_index != -1 && ispressed(fig, Mouse.left)
             # Convert mouse position (in pixels) to data coordinates
-            
-            # dragged_index[] == 1 && return Consume(true) #fixed 1st point
             new_data_pos = Makie.mouseposition(ax_img.scene)
             
-            if dragging_curve[]
+            if target_observable === scaling_pts
+               
                 current_points = scale_rect[]
                 current_points[dragged_index[]] = new_data_pos
                 scale_rect[] = current_points # Notify the Observable of the change
-            else #bezier drag
+                return Consume(true)
+            end
+            if target_observable === ctrl_scatter
                 current_points = current_curve[]
                 move_control_vertices!(current_points, dragged_index[], new_data_pos)
                 current_curve[] = current_points # Notify the Observable of the change
+                return Consume(true)
             end
             
-            # Consume the event to prevent other interactions from running
-            return Consume(true)
         end
         return Consume(false)
     end
@@ -365,9 +403,8 @@ function main(;
     on(events(ax_img).mousebutton, priority = 10) do event
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
-            dragged_index[] = nothing
-            dragging_curve[] = false
-            return Consume(false) #very important
+            dragged_index = -1
+            
         end
         return Consume(false)
     end
@@ -486,3 +523,37 @@ end
 
 
 end # module YetAnotherPlotDigitizer
+
+
+function find_closest_point_to_position(pts, pos; 
+                    PICK_THRESHOLD = 20,
+                    area = :circle, #:circle or :square
+                    )
+    index = -1
+    if area == :circle
+        dist = (p1, p2) -> norm(p1 .- p2)
+    elseif area ==:square
+        dist = (p1, p2) -> max(abs.(p1 .- p2)...)
+    end
+    
+    for (i, pt) in enumerate(pts)
+        d = dist(pt, pos)
+        if d <= PICK_THRESHOLD
+            return (i)
+        end
+    end
+    return index
+end
+
+function get_initial_curve_pts(PTS)
+    X1, X2, Y1, Y2 = PTS
+    R1 = Point2f(X1[1], Y1[2])
+    R2 = Point2d(X2[1], Y2[2])
+    C1 = 0.8 * R1 + 0.2 * R2
+    C2 = 0.6 * R1 + 0.4 * R2
+    C3 = 0.4 * R1 + 0.6 * R2
+    C4 = 0.2 * R1 + 0.8 * R2
+
+    return [C1, C2, C3, C4]
+
+end
