@@ -288,7 +288,7 @@ function main(;
         
         previous_curve_id[] = s
         #put the new data in
-        @info "s", s
+        # @info "s", s
         cdata = ALL_CURVES[s]
 
         tb_curve_name.stored_string[] = cdata.name
@@ -371,7 +371,7 @@ function main(;
     on(events(ax_img.scene).mousebutton, priority = 20) do event
         # Only react to left mouse button press
         if event.button == Mouse.left && event.action == Mouse.press
-            @info "triggered mouse press"
+            # @info "triggered mouse press"
             mousepos = Makie.mouseposition(ax_img.scene)
             dragged_index = -1
             target_observable = nothing
@@ -621,17 +621,14 @@ function export_curves(ALL_CURVES;
         else
             fn = joinpath(export_folder, crv.name * ext)
         end
-        data = resample_curve(crv.pts, N)
+        data = sample_cubic_bezier_curve(crv.pts; samples = N)
         writedlm(fn, data, delim)
     end
     return nothing
 end
 
 
-function resample_curve(crv, N=100)
-    
 
-end
 
 
 end # module YetAnotherPlotDigitizer

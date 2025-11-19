@@ -1,171 +1,5 @@
 
-# function bezier_fit_fig(results::Ref{Dict{String, Any}};
-#                                 PICK_THRESHOLD = 20,
-#                                 )
 
-     
-    
-#     data = results[]["data"]
-#     strain = data.strain
-#     stress = data.stress
-#     min_strain, max_strain = extrema(strain)
-#     min_stress, max_stress = extrema(stress)
-#     strain = collect(strain)
-#     stress = collect(stress) 
-#     # push!(results, "scale factors" => (;max_strain, max_stress))
-#     P1 = Point2f(0, 0)
-#     P4 = Point2f(last(strain), last(stress))
-
-#     mp = findfirst(x-> x>0.2*max_strain, strain)
-#     P2 = Point2f(strain[mp], 1.4 * stress[mp])
-#     mp = findfirst(x -> x> 0.8 * max_strain, strain)
-#     P3 = Point2f(strain[mp], 1.4 * stress[mp])
-
-#     initial_cpoints = Point2f[P1, P2, P3, P4]
-    
-    
-#     cpoints = Observable(initial_cpoints) 
-    
-    
-#     bezier_curve = lift(cpoints) do pts
-#         curve = piecewise_cubic_bezier(pts)
-        
-#         if haskey(results[], "bezier fit")
-#             results[]["bezier fit"] = curve
-#             results[]["status"] = 1
-#             # @info "updated", results[]["status"]
-#         else
-#             push!(results[], "bezier fit"=> curve)
-#         end
-        
-#         curve
-#     end
-
-    
-#     fig = Figure()
-#     ax = Axis(fig[1, 1], title = "Interactive Piecewise Cubic Bézier Curve",
-#                 # aspect = DataAspect(), #maybe not needed
-#                 )
-
-#     label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one.",
-#                     fontsize= 16,
-#                     color = :grey10,
-#                     halign =:center,
-#                     valign = :top,
-#                     padding = (10, 0, 0, 10),
-#                     tellwidth = false,
-#                     )
-#     fig[0,1] = label_help
-#     #
-#     deregister_interaction!(ax, :rectanglezoom)
-
-#     #plot the data
-#     if !isnothing(data)
-#         scatter!(ax, strain, stress, color= :grey50, alpha=0.5, label = "Data")
-#     end
-
-#     # final Bézier curve
-#     lines!(ax, bezier_curve, color = :black, linewidth = 4, label = "Bézier Curve")
-
-#     # control polygon
-#     lines!(ax, cpoints, color = (:grey, 0.5), linestyle = :dash, label = "Control Polygon")
-
-#     #control pts
-#     scatter_plot = scatter!(ax, cpoints, markersize = 15, color = :red, strokecolor = :black, strokewidth = 1, marker = :circle, label = "Control Points")
-
-#     # --- 3. Interactivity: Dragging Control Points ---
-#     # Find the index of the closest control point when the mouse is pressed
-#     dragged_index = Observable{Union{Nothing, Int}}(nothing)
-    
-    
-#      ##################################EVENTS###########################################################################
-
-#     # Interaction for pressing the mouse button
-#     on(events(fig).mousebutton, priority = 10) do event
-#         # Only react to left mouse button press
-#         if event.button == Mouse.left && event.action == Mouse.press
-#             # Pick the closest control point on the scatter plot
-#             # `pick` returns the plot object and the index of the picked element
-#             plot, index = pick(ax.scene, events(ax).mouseposition[])
-            
-#             # Check if a control point was picked
-#             if plot === scatter_plot && index !== nothing
-#                 dragged_index[] = index
-#                 # Consume the event so the default interaction (e.g., pan) doesn't run
-#                 return Consume(true) 
-#             end
-#         end
-#         return Consume(false)
-#     end
-
-#     # Interaction for mouse movement (dragging)
-#     on(events(fig).mouseposition, priority = 10) do mp
-#         if dragged_index[] !== nothing && ispressed(fig, Mouse.left)
-#             # Convert mouse position (in pixels) to data coordinates
-            
-#             # dragged_index[] == 1 && return Consume(true) #fixed 1st point
-#             new_data_pos = Makie.mouseposition(ax.scene)
-            
-#             # Update the specific control point's position
-#             current_points = cpoints[]
-#             move_control_vertices!(current_points, dragged_index[], new_data_pos)
-#             cpoints[] = current_points # Notify the Observable of the change
-            
-#             # Consume the event to prevent other interactions from running
-#             return Consume(true)
-#         end
-#         return Consume(false)
-#     end
-
-#     # Interaction for releasing the mouse button
-#     on(events(fig).mousebutton, priority = 10) do event
-#         if event.button == Mouse.left && event.action == Mouse.release
-#             # Stop dragging
-#             dragged_index[] = nothing
-#             return Consume(true)
-#         end
-#         return Consume(false)
-#     end
-
-    
-    
-#     on(events(fig).keyboardbutton, priority = 10) do event
-#         if event.action == Keyboard.press
-#             current_points = cpoints[]
-            
-#             if event.key == Keyboard.a # Add point
-#                 # Check if we have a valid mouse position in data coordinates
-#                 data_pos = try Makie.mouseposition(ax.scene) catch; return Consume(false) end
-                
-#                 add_bezier_segment!(current_points, data_pos)
-#                 # @info "current_points",current_points
-#                 cpoints[] = current_points
-#                 return Consume(true)
-            
-#             elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
-#                 data_pos = try Makie.mouseposition(ax.scene) catch; return Consume(false) end
-#                 remove_bezier_segment!(current_points, data_pos)
-#                 cpoints[] = current_points
-#             end
-            
-#         end
-#         return Consume(false)
-#     end
-
-#     # Set up the Axis limits to encompass the initial points
-#     autolimits!(ax)
-    
-#     # Add a Legend (optional, but helpful)
-#     fig[1, 2] = Legend(fig, ax)
-
-#     # Display the figure
-#     screen = GLMakie.Screen()
-#     display(screen, fig)
-
-#     wait(fig.scene)
-
-#     return nothing
-# end
 
 function cubic_bezier_point(t::Real, P0, P1, P2, P3)
     # The standard cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
@@ -179,11 +13,31 @@ function cubic_bezier_point(t::Real, P0, P1, P2, P3)
     return P0 * w0 + P1 * w1 + P2 * w2 + P3 * w3
 end
 
+function cubic_bezier_segment_derivative(segment::Vector{PT}, t) where PT
+    @assert length(controls) == 4 "A cubic segment requires exactly 4 control points."
+    T = eltype(first(segment))
+    t = T(t)
+
+    P0, P1, P2, P3 = controls[1:4]
+
+    Q0 = PT(3.0 * (P1 - P0))
+    Q1 = PT(3.0 * (P2 - P1))
+    Q2 = PT(3.0 * (P3 - P2))
+
+    t_ = one(T) - t
+    
+    # B'(t) = Q0*t'^2 + 2*Q1*t'*t + Q2*t^2 (Quadratic Bézier formula)
+    return PT(t_^2 * Q0 + 2.0 * t_ * t * Q1 + t^2 * Q2)
+end
+
+
 # Function to generate the piecewise cubic Bézier curve points
 function piecewise_cubic_bezier(control_points::Vector{PT}; 
                                 N_segments=50, #how many sub-segments to draw for each segment
                                 ) where PT
 
+    @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
+    
     curve_points = PT[]
     n_points = length(control_points)
 
@@ -215,6 +69,87 @@ function piecewise_cubic_bezier(control_points::Vector{PT};
     return curve_points
 end
 
+
+
+
+"""
+    sample_arc_length(segment::Vector{PT}; samples = 100) where PT
+
+Simple accumulation of linear segments.
+Return a tuple (t, L) of t values and their corresponding arc lengths.
+"""
+function sample_arc_length(segment::Vector{PT}; samples = 100) where PT
+    #returns a tuple of t values and their corresponding arc length
+    T = eltype(first(segment))
+    @assert length(segment) == 4 "Cubic segment must have 4 control points"
+    ti = LinRange(0, 1, samples)
+    L = zeros(T, size(ti))
+    P_prev = first(segment)
+    for (i, t) in enumerate(ti) 
+        P_curr = cubic_bezier_point(t, segment...)
+        L[i] = norm(P_curr - P_prev)
+        if i>1
+            L[i] += L[i-1]
+        end
+        P_prev = P_curr
+    end
+    return (ti, L)
+end
+
+
+function create_arc_length_lut(control_points::Vector{PT}; samples_per_segment=50) where PT
+    lut = (;index = [1], tval = [0.0], length = [0.0])
+    
+
+    cumulative_length = 0.0
+    
+    idx_main_pts = filter(i -> is_main_vertex(control_points, i), 1:length(control_points))
+    num_segments = length(idx_main_pts) - 1
+
+    for i in 1:num_segments
+        i1, i2 = idx_main_pts[i], idx_main_pts[i+1]
+        seg = view(control_points, i1:i2)
+        (t, L) = sample_arc_length(seg; samples_per_segment)
+        for j in 1:samples_per_segment
+           
+            push!(lut.index, i)
+            push!(lut.tval, t[j])
+            push!(lut.length, cumulative_length + L[j])
+        end
+        cumulative_length += last(L)
+    end
+
+    return lut, cumulative_length
+end
+
+
+function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100; lut_samples = 20) where PT
+    @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
+    
+    LUT,total_arc_length = create_arc_length_lut(control_points; samples_per_segment = lut_samples)
+     
+    idx_main_pts = filter(1 -> is_main_vertex(control_points, i), 1:length(control_points))
+    num_segments = length(idx_main_pts) - 1
+
+    l_samples = LinRange(0, total_arc_length, samples)
+    PTS = [first(control_points)]
+    for (i, len) in enumerate(l_samples)
+        i==1 && continue
+        i == lut_samples && push!(PTS, last(control_points))
+
+        idx = findfirst(l -> l > len, LUT.length) #lookup
+        #linear interpolate on the previous segment
+        l1, l2 = LUT.length[idx-1], LUT.length[idx]
+        t = (l2-len) / (l2 - l1) 
+        idseg = LUT.index[idx]
+        i1, i2 = idx_main_pts[idseg], idx_main_pts[idxseg+1]
+        CP = view(control_points, i1:i2)
+        P1 = cubic_bezier_point(t1, CP...)
+        P2 = cubic_bezier_point(t2, CP...)
+        push!(PTS, (1-t)* P1 + t * P2)
+    end
+    return PTS
+end
 
 function add_bezier_segment!(vertices, mousepos)
     #identify where to put new point
