@@ -126,11 +126,10 @@ end
 function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100, lut_samples = 20) where PT
     @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
     
-    LUT,total_arc_length = create_arc_length_lut(control_points; samples_per_segment = lut_samples)
+    LUT, total_arc_length = create_arc_length_lut(control_points; samples_per_segment = lut_samples)
      
     idx_main_pts = filter(i -> is_main_vertex(control_points, i), 1:length(control_points))
-    num_segments = length(idx_main_pts) - 1
-
+    
     l_samples = LinRange(0, total_arc_length, samples)
     PTS = [first(control_points)]
     for (i, len) in enumerate(l_samples)
@@ -143,7 +142,7 @@ function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100, lu
         idx = findfirst(l -> l >= len, LUT.length) #lookup
         #linear interpolate on the previous segment
         l1, l2 = LUT.length[idx-1], LUT.length[idx]
-        t = (len - l1) / (l2 - l1) 
+        t = (len - l1) / (l2 - l1)  #TODO this could be a starting point for Newton Raphson
         idseg = LUT.index[idx]
         i1, i2 = idx_main_pts[idseg], idx_main_pts[idseg+1]
         CP = view(control_points, i1:i2)
@@ -157,6 +156,7 @@ end
 
 function add_bezier_segment!(vertices, mousepos)
     #identify where to put new point
+    #TODO a better way to id the closest segment ?
     Q, i1, i2 = find_closest_main_segment_horizontal(vertices, mousepos) #closest point on control polygon to mouseposition
     # @info "Q", Q, "i1 ", i1, " i2 ", i2
     V1, V2 = vertices[i1+1], vertices[i2-1] #closest control verts
