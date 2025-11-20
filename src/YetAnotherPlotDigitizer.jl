@@ -628,6 +628,15 @@ function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) wher
     #simplest case where we ignore rotation and log space
     X1, X2, Y1, Y2 = scale_rect #point2f - plot coords
     x1, x2, y1, y2 = plot_range #scalars - target coords
+    if scale_type[1] == :log
+        @assert x1 > 0 && x2 > 0 "x1 and x2 must be positive for logarithmic spacing"
+    elseif scale_type[2] == :log
+        @assert y1 > 0 && y2 > 0 "y1 and y2 must be positive for logarithmic spacing"
+    end
+    x1 = scale_type[1] == :log ? log(x1) : x1
+    x2 = scale_type[1] == :log ? log(x2) : x2
+    y1 = scale_type[2] == :log ? log(y1) : y1
+    y2 = scale_type[2] == :log ? log(y2) : y2
     scale_x = (x2 - x1) / (X2[1] - X1[1])
     scale_y = (y2 - y1) / (Y2[2] - Y1[2])
     tX = -X1[1]
@@ -638,7 +647,9 @@ function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) wher
     for i in eachindex(PTS)
         x, y = PTS[i]
         x = (x + tX) * scale_x + tx
+        x = scale_type[1] == :log ? exp(x) : x
         y = (y + tY) * scale_y + ty
+        y = scale_type[2] == :log ? exp(y) : y
         out[i, :] .= x, y
     end
     return out
