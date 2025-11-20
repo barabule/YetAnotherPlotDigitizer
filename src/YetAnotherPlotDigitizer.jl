@@ -296,7 +296,7 @@ function main(;
     
 
     on(tb_curve_name.stored_string) do s
-        id = menu_curves.selection[]
+        id = edited_curve_id[]
         
         update_curve!(ALL_CURVES, id; name = s)
         #also update the menu entry
