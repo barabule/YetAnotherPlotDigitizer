@@ -8,17 +8,17 @@ To install:
 Navigate to a new (empty) folder and start Julia there.
 Go into package mode via ]
 
-'''
+```
 activate .
 add https://github.com/barabule/YetAnotherPlotDigitizer.git
-'''
+```
 
 Then, after it finishes installing, exit package more (Backspace) and type:
 
-'''
+```
 using YetAnotherPlotDigitizer
 main()
-'''
+```
 
 This will start a GUI.
 Drop an image onto the window to load it.
