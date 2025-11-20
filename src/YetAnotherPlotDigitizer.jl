@@ -616,7 +616,8 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
         end
         data = sample_cubic_bezier_curve(crv.points; samples = N, lut_samples = 200)
         #needs to be transformed
-        tdata = transform_pts(data, scale_rect, plot_range, scale_type)
+        X1, X2, Y1, Y2 = scale_rect
+        tdata = transform_pts(data, (X1[1], X2[1], Y1[2], Y2[2]), plot_range, scale_type)
         writedlm(fn, tdata, delim)
         @info "Exported", fn
     end
@@ -624,37 +625,67 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
     return nothing
 end
 
-function transform_pts(PTS::Vector{PT}, scale_rect, plot_range, scale_type) where PT
-    #simplest case where we ignore rotation and log space
-    X1, X2, Y1, Y2 = scale_rect #point2f - plot coords
-    x1, x2, y1, y2 = plot_range #scalars - target coords
-    if scale_type[1] == :log
-        @assert x1 > 0 && x2 > 0 "x1 and x2 must be positive for logarithmic spacing"
-    elseif scale_type[2] == :log
-        @assert y1 > 0 && y2 > 0 "y1 and y2 must be positive for logarithmic spacing"
+
+abstract type ScaleType end
+
+struct LogScaleType<:ScaleType
+end
+
+struct LinearScaleType<:ScaleType
+end
+
+function ScaleType(s::Symbol)
+    if s==:linear
+        return LinearScaleType()
+    elseif s == :log
+        return LogScaleType()
+    else
+        error("s must be either :linear or :log")
     end
-    x1 = scale_type[1] == :log ? log(x1) : x1
-    x2 = scale_type[1] == :log ? log(x2) : x2
-    y1 = scale_type[2] == :log ? log(y1) : y1
-    y2 = scale_type[2] == :log ? log(y2) : y2
-    scale_x = (x2 - x1) / (X2[1] - X1[1])
-    scale_y = (y2 - y1) / (Y2[2] - Y1[2])
-    tX = -X1[1]
-    tY = -Y1[2]
-    tx = x1 
-    ty = y1 
+end
+
+function transform_pts(PTS::Vector{PT}, source, target, scale_type) where PT
+    #simplest case where we ignore rotation and log space
+    T = eltype(first(PTS))
+    X1, X2, Y1, Y2 = source #scalars - plot coords
+    x1, x2, y1, y2 = target #scalars - target coords
+
     out = zeros(eltype(X1), length(PTS), 2)
-    for i in eachindex(PTS)
-        x, y = PTS[i]
-        x = (x + tX) * scale_x + tx
-        x = scale_type[1] == :log ? exp(x) : x
-        y = (y + tY) * scale_y + ty
-        y = scale_type[2] == :log ? exp(y) : y
-        out[i, :] .= x, y
+    for i in 1:2
+        SP1, SP2 = source[2i-1], source[2i]
+        TP1, TP2 = target[2i-1], target[2i]
+        out[:,i] .= transform([p[i] for p in PTS],(SP1, SP2), (TP1, TP2), ScaleType(scale_type[i]))
+        # if scale_type[i] == :linear
+        #     out[:, i] .= transform_linear([p[i] for p in PTS],(SP1, SP2), (TP1, TP2))
+        # else #log
+        #     out[:, i] .= transform_log([p[i] for p in PTS], (SP1, SP2), (TP1, TP2))
+        # end
     end
     return out
 end
 
+function transform(coords::Vector{T}, source::Tuple{T1, T1}, target::Tuple{T2, T2}, ::LinearScaleType) where {T, T1, T2}
+    X1, X2 = source
+    x1, x2 = target
 
+    s = (x2 - x1) / (X2 - X1)
+    TRN = -X1
+    trn = x1
+    return @. (coords + TRN) * s + trn
+end
+
+
+function transform(coords::Vector{T}, source::Tuple{T1, T1}, target::Tuple{T2, T2}, ::LogScaleType) where {T, T1, T2}
+    X1, X2 = source
+    x1, x2 = target
+    @assert x1 > 0 && x2 > 0 "Both target coordinates must be positive for logarithmic scaling!"
+    x1, x2 = log(x1), log(x2)
+
+    s = (x2 - x1) / (X2 - X1)
+    TRN = -X1
+    trn = x1
+    return @. exp((coords + TRN) * s + trn)
+
+end
 
 end # module YetAnotherPlotDigitizer
