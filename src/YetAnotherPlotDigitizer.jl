@@ -158,9 +158,9 @@ function main(;
 
     btn_add_curve = Button(fig, label = "Add")
     btn_rem_curve = Button(fig, label = "Rem")
-
+    label_curve_name = Label(fig, "Current curve:", width = sidebar_width)
     CURRENT_CURVE_GL[1, 1] =vgrid!(
-                    Label(fig, "Current curve"),
+                    label_curve_name,
                     hgrid!(Label(fig, "Name"), tb_curve_name),
                     hgrid!(btn_add_curve, btn_rem_curve),
                     )
@@ -219,7 +219,7 @@ function main(;
                         )
 
 
-    curve_controls = [tb_curve_name, current_color, current_curve]
+    curve_controls = [tb_curve_name, current_color, current_curve, label_curve_name]
 
     #############BOTTOM#################################################################################################
 
@@ -271,10 +271,7 @@ function main(;
         new_name = "Curve $inext"
         pts = get_initial_curve_pts(scale_rect[])
 
-        new_color = cmap[rand(
-                            filter(i->i!=edited_curve_id, 1:length(cmap))
-                            )
-                        ]
+        new_color = cmap[inext]
         nt = (;name = new_name,
                color = new_color,
                points= pts)     
@@ -282,6 +279,9 @@ function main(;
         push!(ALL_CURVES, nt)
         rebuild_menu_options!(menu_curves, ALL_CURVES)
         update_current_curve_controls!(curve_controls, nt)
+        #also update 
+        edited_curve_id[] = inext
+        
     end
 
     on(btn_rem_curve.clicks) do _
@@ -293,6 +293,7 @@ function main(;
             rebuild_menu_options!(menu_curves, ALL_CURVES)
             edited_curve_id[] = lastindex(ALL_CURVES)#set the current curve to the last in the list
             update_current_curve_controls!(curve_controls, ALL_CURVES[edited_curve_id[]])#we should also update the color etc...
+            
         end
     end
 
@@ -322,7 +323,8 @@ function main(;
         # @info "opts", opts
         opts[id] = (s, opts[id][2])
         menu_curves.options[] = opts
-        
+
+        label_curve_name.text[] = "Current curve: $s"
     end
 
     on(current_color) do c
@@ -622,11 +624,11 @@ function update_curve!(CRV, id; name = nothing,
 end
 
 function update_current_curve_controls!(curve_controls, cdata)
-    TB, current_color, current_curve = curve_controls
+    TB, current_color, current_curve, crv_label = curve_controls
     TB.placeholder[] = cdata.name
     current_color[] = cdata.color
     current_curve[] = cdata.points
-
+    crv_label.text[] = "Current curve: $(cdata.name)"
     return nothing
 end
 
