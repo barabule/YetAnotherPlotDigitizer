@@ -179,7 +179,7 @@ function main(;
     CC_COLOR_GL[1,1] = empty_layout
 
     HIDDEN_GL[1,1] = color_option_grid
-    populate_dropdown(fig,
+    populate_color_chooser(fig,
                       color_option_grid, 
                       cmap, 
                       current_color, 
@@ -283,38 +283,19 @@ function main(;
                points= pts)     
 
         push!(ALL_CURVES, nt)
-        @info "ALL_CURVES", ALL_CURVES
-        # opts = menu_curves.options[]
-        # @info "options before", opts
         rebuild_menu_options!(menu_curves, ALL_CURVES)
-        
-        # @info "options after", menu_curves.options[]
         update_current_curve_controls!(curve_controls, nt)
-        # menu_curves.i_selected[] = inext
     end
 
     on(btn_rem_curve.clicks) do _
         #remove the current curve
         num_curves = length(ALL_CURVES)
         if num_curves >1
-            #delete the current curve
-            id_delete = edited_curve_id[]
+            id_delete = edited_curve_id[]#delete the current curve
             deleteat!(ALL_CURVES, id_delete[])
-            #take care of the menu entries
-            opts = menu_curves.options[]
-            deleteat!(opts, id_delete)
-            #need to update the indices in opt
-            for i in eachindex(opts)
-                key, idx = opts[i]
-                # @info "key", key, "val", idx
-                opts[i] = (key, i)
-            end
-            menu_curves.options[] = opts
-            
-            #set the current curve to the last in the list
-            edited_curve_id[] = lastindex(ALL_CURVES)
-            #we should also update the color etc...
-            update_current_curve_controls!(curve_controls, ALL_CURVES[edited_curve_id[]])
+            rebuild_menu_options!(menu_curves, ALL_CURVES)
+            edited_curve_id[] = lastindex(ALL_CURVES)#set the current curve to the last in the list
+            update_current_curve_controls!(curve_controls, ALL_CURVES[edited_curve_id[]])#we should also update the color etc...
         end
     end
 
@@ -526,7 +507,7 @@ end
 
 
 # create for each color a button and behavior
-function populate_dropdown(fig::Figure, grid::GridLayout, 
+function populate_color_chooser(fig::Figure, grid::GridLayout, 
                             colormap_entries, 
                             current_color::Observable, 
                             is_open:: Observable;
@@ -566,21 +547,6 @@ function populate_dropdown(fig::Figure, grid::GridLayout,
     
     return
 end
-
-
-function reset_plot!(ax::Axis, delete_plots= nothing::Union{Nothing, Vector{Plot}})
-
-    
-    
-    !isnothing(delete_plots) && delete!(ax, delete_plots)
-
-    
-    reset_limits!(ax)
-    
-end
-
-
-
 
 
 
