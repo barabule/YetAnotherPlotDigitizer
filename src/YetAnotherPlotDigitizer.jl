@@ -125,7 +125,8 @@ function main(;
     #################### SCALE / GLOBAL ################################################################################
 
 
-    tbscale = [Textbox(fig, width = sidebar_width/3, validator = Float64) for _ in 1:4]
+    tbscale = [Textbox(fig, width = sidebar_width/3, validator = Float64, 
+                            placeholder = "$(plot_range[][i])") for i in 1:4]
     cblogx = Checkbox(fig, checked=false)
     cblogy = Checkbox(fig, checked=false)
     SCALE_GL[1,1] = Label(fig, "Scale")
@@ -225,7 +226,10 @@ function main(;
 
     menu_export = Menu(fig, 
                         options = [("CSV", :csv), 
-                                    ("TXT", :txt)],
+                                    ("TXT", :txt),
+                                    ("SPACE", :space),
+                                    ("Semicolon ;", :semicolon),
+                                    ],
                         default = "CSV",
                         width = 80,
                         )
@@ -364,7 +368,16 @@ function main(;
     on(btn_export.clicks) do _
         N = num_export[]
         format = menu_export.selection[]
-       
+        #check if the are negative numbers when log scale range
+        for i in 1:2
+            if scale_type[][i] == :log
+                if plot_range[][2i-1] <= 0 || plot_range[][2i] <= 0 
+                    @info "Cannot export, log scaling needs positive numbers.\n
+                    Please set the X1, X2, Y1 or Y2 to be positive!"
+                    return nothing
+                end
+            end
+        end
         export_curves(ALL_CURVES, 
                     scale_rect[], 
                     plot_range[], 
@@ -601,11 +614,13 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
 
 
     if format==:csv
-        ext = ".csv"
-        delim = ','
+        ext, delim = ".csv", ','
     elseif format == :txt
-        ext = ".txt"
-        delim = ','
+        ext, delim = ".txt", '\t'
+    elseif format == :space
+        ext, delim = ".txt", ' '
+    elseif format == :semicolon
+        ext ,delim = ".txt", ';'
     end
 
     for crv in ALL_CURVES
