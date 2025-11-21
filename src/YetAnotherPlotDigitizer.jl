@@ -11,6 +11,10 @@ using FileIO
 using Colors
 using DelimitedFiles
 
+
+
+
+include("typedefs.jl")
 include("bezier.jl")
 
 
@@ -641,23 +645,7 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
 end
 
 
-abstract type ScaleType end
 
-struct LogScaleType<:ScaleType
-end
-
-struct LinearScaleType<:ScaleType
-end
-
-function ScaleType(s::Symbol)
-    if s==:linear
-        return LinearScaleType()
-    elseif s == :log
-        return LogScaleType()
-    else
-        error("s must be either :linear or :log")
-    end
-end
 
 function transform_pts(PTS::Vector{PT}, source, target, scale_type) where PT
     #simplest case where we ignore rotation and log space
