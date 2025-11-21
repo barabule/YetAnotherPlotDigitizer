@@ -227,7 +227,7 @@ function main(;
 
     menu_export = Menu(fig, 
                         options = [("CSV", :csv), 
-                                    ("TXT", :txt),
+                                    ("TAB", :tab),
                                     ("SPACE", :space),
                                     ("Semicolon ;", :semicolon),
                                     ],
@@ -649,7 +649,7 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
 
     if format==:csv
         ext, delim = ".csv", ','
-    elseif format == :txt
+    elseif format == :tab
         ext, delim = ".txt", '\t'
     elseif format == :space
         ext, delim = ".txt", ' '
