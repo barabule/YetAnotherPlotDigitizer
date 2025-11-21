@@ -32,8 +32,8 @@ function main(;
     #######GLOBALS###########################
     
     ###markers for the scaling range selection
-    # a ring with a vertical bar 
-    Ring = BezierPath([
+    # a RingBarMarker with a vertical bar 
+    RingBarMarker = BezierPath([
             MoveTo(Point(1, 0)),
             EllipticalArc(Point(0, 0), 1, 1, 0, 0, 2pi),
             MoveTo(Point(0.5, 0.0)),
@@ -59,12 +59,9 @@ function main(;
     
 
     #scaling range markers
-    sz = size(ref_img[])
-    X1 = Point2f(0.1 * sz[1], 0.1 * sz[2])
-    X2 = Point2f(0.9 * sz[1], 0.1 * sz[2])
-    Y1 = Point2f(0.5 * sz[1], 0.1 * sz[2])
-    Y2 = Point2f(0.5 * sz[1], 0.9 * sz[2])
-    scale_rect = Observable([X1, X2, Y1, Y2])
+    PZ=  zero(Point2f)
+    scale_rect = Observable([PZ, PZ, PZ, PZ]) #initialize
+    reset_marker_positions!(size(ref_img[]), scale_rect) #set to default positions
     scale_type = Observable([:linear, :linear])
 
     
@@ -194,7 +191,7 @@ function main(;
 
     img_plot = image!(ax_img, ref_img)
     scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
-                                marker = Ring,
+                                marker = RingBarMarker,
                                 markersize = PICK_THRESHOLD/2,
                                 rotation = [0, 0, pi/2, pi/2]),
 
@@ -364,10 +361,12 @@ function main(;
                 deleteat!(ALL_CURVES, 2:length(ALL_CURVES))
             end
             ALL_CURVES[1] =ntinit #put the initial simple curve into the 1st slot
+            reset_marker_positions!(size(ref_img[]), scale_rect)
             current_curve[] = get_initial_curve_pts(scale_rect[])
             menu_curves.options[] = [("Curve 01", 1)]
             tb_curve_name.placeholder = "Curve 01"
             edited_curve_id[] = 1
+                    
         catch e
             @info "Probably not an image?"
             
@@ -586,6 +585,20 @@ function get_initial_curve_pts(PTS)
     C4 = 0.2 * R1 + 0.8 * R2
 
     return [C1, C2, C3, C4]
+
+end
+
+function reset_marker_positions!(imsize, markers)
+    
+
+    sz = imsize
+    X1 = Point2f(0.1 * sz[1], 0.1 * sz[2])
+    X2 = Point2f(0.9 * sz[1], 0.1 * sz[2])
+    Y1 = Point2f(0.5 * sz[1], 0.1 * sz[2])
+    Y2 = Point2f(0.5 * sz[1], 0.9 * sz[2])
+    markers[] = [X1, X2, Y1, Y2]
+    
+    return nothing
 
 end
 
