@@ -376,7 +376,7 @@ function main(;
             menu_curves.options[] = [("Curve 01", 1)]
             tb_curve_name.placeholder = "Curve 01"
             edited_curve_id[] = 1
-                    
+            switch_other_curves_plot!(ax_img, ALL_CURVES, 1, other_curve_plots)        
         catch e
             @info "Probably not an image?"
             
