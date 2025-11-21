@@ -89,7 +89,8 @@ function main(;
     num_export = Observable(100) #how many points per curve to export
     export_folder = nothing
 
-
+    other_curve_plots = [] #holds the plot objects for other curves than the current
+    #update when adding/ deleting or switching
     #######LAYOUT#######################################################################################################
 
 
@@ -270,18 +271,24 @@ function main(;
         inext= length(ALL_CURVES)+1
         new_name = "Curve $inext"
         pts = get_initial_curve_pts(scale_rect[])
+        
 
-        new_color = cmap[inext]
+        next_color_id = mod(inext, num_colors) + 1
+        new_color = cmap[next_color_id]
         nt = (;name = new_name,
                color = new_color,
                points= pts)     
-
-        push!(ALL_CURVES, nt)
-        rebuild_menu_options!(menu_curves, ALL_CURVES)
-        update_current_curve_controls!(curve_controls, nt)
-        #also update 
-        edited_curve_id[] = inext
         
+        push!(ALL_CURVES, nt)
+        edited_curve_id[] = inext
+        rebuild_menu_options!(menu_curves, ALL_CURVES)
+        # @info "colors before", [c.color for c in ALL_CURVES]
+        update_current_curve_controls!(curve_controls, nt)
+        # @info "colors after", [c.color for c in ALL_CURVES]
+        #also update 
+        
+        
+        switch_other_curves_plot!(ax_img, ALL_CURVES, inext, other_curve_plots)
     end
 
     on(btn_rem_curve.clicks) do _
@@ -293,7 +300,7 @@ function main(;
             rebuild_menu_options!(menu_curves, ALL_CURVES)
             edited_curve_id[] = lastindex(ALL_CURVES)#set the current curve to the last in the list
             update_current_curve_controls!(curve_controls, ALL_CURVES[edited_curve_id[]])#we should also update the color etc...
-            
+            switch_other_curves_plot!(ax_img, ALL_CURVES, edited_curve_id[], other_curve_plots)
         end
     end
 
@@ -310,6 +317,7 @@ function main(;
         cdata = ALL_CURVES[s]
 
         update_current_curve_controls!(curve_controls, cdata)
+        switch_other_curves_plot!(ax_img, ALL_CURVES, s, other_curve_plots)
     end
 
     
@@ -625,8 +633,8 @@ end
 
 function update_current_curve_controls!(curve_controls, cdata)
     TB, current_color, current_curve, crv_label = curve_controls
-    TB.placeholder[] = cdata.name
-    current_color[] = cdata.color
+    # TB.placeholder[] = cdata.name #this doesn't do anything
+    current_color[] = cdata.color 
     current_curve[] = cdata.points
     crv_label.text[] = "Current curve: $(cdata.name)"
     return nothing
@@ -640,6 +648,33 @@ function rebuild_menu_options!(menu, ALL_CURVES)
     end
     menu.options[] = opts
 end
+
+
+function switch_other_curves_plot!(ax, all_curves, id, plot_handles)
+    #delete old plots
+    if !isnothing(plot_handles) || !isempty(plot_handles)
+        for plt in plot_handles
+            delete!(ax, plt)
+        end
+        empty!(plot_handles)
+    else
+        return nothing
+    end
+    #gather new curves to plot
+    ids = filter(i -> i!=id, eachindex(all_curves))
+    @info "ids", ids, "id", id
+    if !isnothing(ids)
+        for i in ids
+            crv = all_curves[i]
+            pts = piecewise_cubic_bezier(crv.points)
+            color = crv.color
+            push!(plot_handles, lines!(ax, pts, color= color))
+        end
+        
+    end
+    return nothing
+end
+
 
 function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type; 
                     N = 100, 
