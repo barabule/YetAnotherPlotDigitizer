@@ -160,12 +160,13 @@ function main(;
     tb_curve_name = Textbox(fig, placeholder = "Curve 01", width = 0.7 * sidebar_width)
 
     btn_add_curve = Button(fig, label = "Add")
+    btn_rem_curve = Button(fig, label = "Rem")
 
     CURRENT_CURVE_GL[1, 1] =vgrid!(
                     Label(fig, "Current curve"),
                     hgrid!(Label(fig, "Name"), tb_curve_name),
-                    btn_add_curve,
-    )
+                    hgrid!(btn_add_curve, btn_rem_curve),
+                    )
 
     ##############COLOR GRID############################################################################################
 
@@ -221,6 +222,8 @@ function main(;
                         )
 
 
+    curve_controls = [tb_curve_name, current_color, current_curve]
+
     #############BOTTOM#################################################################################################
 
     btn_export = Button(fig, label="Export", width = 50)
@@ -270,17 +273,51 @@ function main(;
         inext= length(ALL_CURVES)+1
         new_name = "Curve $inext"
         pts = get_initial_curve_pts(scale_rect[])
-        current_curve[] = pts
-        current_color[] = cmap[inext]
-        push!(ALL_CURVES, (;name = new_name,
-                        color = current_color[],
-                        points= pts))
-        opts = menu_curves.options[]
-        push!(opts, (new_name, inext))
-        menu_curves.options[] = opts
-        tb_curve_name.displayed_string = new_name
-        menu_curves.i_selected[] = inext
+
+        new_color = cmap[rand(
+                            filter(i->i!=edited_curve_id, 1:length(cmap))
+                            )
+                        ]
+        nt = (;name = new_name,
+               color = new_color,
+               points= pts)     
+
+        push!(ALL_CURVES, nt)
+        @info "ALL_CURVES", ALL_CURVES
+        # opts = menu_curves.options[]
+        # @info "options before", opts
+        rebuild_menu_options!(menu_curves, ALL_CURVES)
+        
+        # @info "options after", menu_curves.options[]
+        update_current_curve_controls!(curve_controls, nt)
+        # menu_curves.i_selected[] = inext
     end
+
+    on(btn_rem_curve.clicks) do _
+        #remove the current curve
+        num_curves = length(ALL_CURVES)
+        if num_curves >1
+            #delete the current curve
+            id_delete = edited_curve_id[]
+            deleteat!(ALL_CURVES, id_delete[])
+            #take care of the menu entries
+            opts = menu_curves.options[]
+            deleteat!(opts, id_delete)
+            #need to update the indices in opt
+            for i in eachindex(opts)
+                key, idx = opts[i]
+                # @info "key", key, "val", idx
+                opts[i] = (key, i)
+            end
+            menu_curves.options[] = opts
+            
+            #set the current curve to the last in the list
+            edited_curve_id[] = lastindex(ALL_CURVES)
+            #we should also update the color etc...
+            update_current_curve_controls!(curve_controls, ALL_CURVES[edited_curve_id[]])
+        end
+    end
+
 
     on(menu_curves.selection) do s
         if edited_curve_id[] == s || isnothing(s)
@@ -293,9 +330,7 @@ function main(;
         # @info "s", s
         cdata = ALL_CURVES[s]
 
-        tb_curve_name.stored_string[] = cdata.name
-        current_color[] = cdata.color
-        current_curve[] = cdata.points
+        update_current_curve_controls!(curve_controls, cdata)
     end
 
     
@@ -605,6 +640,24 @@ function update_curve!(CRV, id; name = nothing,
     
     CRV[id] = (;name, color, points)
 
+end
+
+function update_current_curve_controls!(curve_controls, cdata)
+    TB, current_color, current_curve = curve_controls
+    TB.placeholder[] = cdata.name
+    current_color[] = cdata.color
+    current_curve[] = cdata.points
+
+    return nothing
+end
+
+function rebuild_menu_options!(menu, ALL_CURVES)
+    
+    opts = Vector{Tuple{String, Int}}()
+    for (i, crv) in enumerate(ALL_CURVES)
+        push!(opts, (crv.name, i))
+    end
+    menu.options[] = opts
 end
 
 function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type; 
