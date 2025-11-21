@@ -150,12 +150,12 @@ function main(;
                         default = "Curve 01", 
                         width = 0.5 * sidebar_width
                         )
+
     ALL_CURVES_GL[1, 1] = vgrid!(
                         hgrid!(Label(fig, "Curve: "), menu_curves),
-    )
+                                )
 
-
-    # ###############CURVE##############################################################################################
+    #################CURVE##############################################################################################
 
     tb_curve_name = Textbox(fig, placeholder = "Curve 01", width = 0.7 * sidebar_width)
 
@@ -167,7 +167,7 @@ function main(;
                     btn_add_curve,
     )
 
-    #####COLOR GRID
+    ##############COLOR GRID############################################################################################
 
     btn_color = Button(fig,
                         label = "Color",
@@ -211,8 +211,6 @@ function main(;
     lines!(ax_img, current_curve, color = (:grey, 0.5), linestyle = :dash)
 
     #control pts
-    
-    
     ctlr_colors = @lift map(i -> is_main_vertex($current_curve, i) ? :blue : :red, eachindex($current_curve))
     ctrl_scatter = scatter!(ax_img, current_curve, 
                         markersize = PICK_THRESHOLD, 
@@ -222,9 +220,8 @@ function main(;
                         marker = :circle, 
                         )
 
-    
 
-    #############BOTTOM######################################
+    #############BOTTOM#################################################################################################
 
     btn_export = Button(fig, label="Export", width = 50)
 
@@ -247,7 +244,7 @@ function main(;
                             )           
 
 
-    ########EVENTS###########################################
+    ###############EVENTS###############################################################################################
     
     on(is_colorgrid_visible) do val
         if val
@@ -392,9 +389,7 @@ function main(;
                     )
 
     end
-    #####################MOUSE Interaction#########################################
-
-    
+    #####################MOUSE Interaction##############################################################################
     
     on(events(ax_img.scene).mousebutton, priority = 20) do event
         # Only react to left mouse button press
@@ -403,7 +398,8 @@ function main(;
             mousepos = Makie.mouseposition(ax_img.scene)
             dragged_index = -1
             target_observable = nothing
-            
+            #manual priority
+
             #try the scaling pts
             idx = find_closest_point_to_position(scale_rect[], mousepos; PICK_THRESHOLD, area= :square)
             if idx !=-1
@@ -482,7 +478,7 @@ function main(;
     end
 
 
-    #######################
+    ####################################################################################################################
     
     
     
