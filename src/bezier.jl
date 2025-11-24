@@ -1,7 +1,7 @@
 
 
 
-function cubic_bezier_point(t::Real, P0, P1, P2, P3)
+function cubic_bezier_point(t::Real, P0::PT, P1::PT, P2::PT, P3::PT) where PT
     # The standard cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
     a = 1 - t
     b = a * a
@@ -10,23 +10,18 @@ function cubic_bezier_point(t::Real, P0, P1, P2, P3)
     w1 = 3 * b * t
     w2 = 3 * a * t^2
     w3 = t^3
-    return P0 * w0 + P1 * w1 + P2 * w2 + P3 * w3
+    return PT(P0 * w0 + P1 * w1 + P2 * w2 + P3 * w3)
 end
 
-function cubic_bezier_segment_derivative(segment::Vector{PT}, t) where PT
-    @assert length(controls) == 4 "A cubic segment requires exactly 4 control points."
-    T = eltype(first(segment))
-    t = T(t)
-
-    P0, P1, P2, P3 = controls[1:4]
-
+function cubic_bezier_segment_derivative(t, P0::PT, P1::PT, P2::PT, P3::PT) where PT
+    
+    T = eltype(P0)
+    
     Q0 = PT(3.0 * (P1 - P0))
     Q1 = PT(3.0 * (P2 - P1))
     Q2 = PT(3.0 * (P3 - P2))
 
     t_ = one(T) - t
-    
-    # B'(t) = Q0*t'^2 + 2*Q1*t'*t + Q2*t^2 (Quadratic Bézier formula)
     return PT(t_^2 * Q0 + 2.0 * t_ * t * Q1 + t^2 * Q2)
 end
 
@@ -36,20 +31,16 @@ function piecewise_cubic_bezier(control_points::Vector{PT};
                                 N_segments=50, #how many sub-segments to draw for each segment
                                 ) where PT
 
-    @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
+    n_points = length(control_points)
+    @assert (n_points - 1) % 3 == 0 "Must have 3k+1 control points for k = segments!"
 
     curve_points = PT[]
-    n_points = length(control_points)
-
-    if n_points < 4
-        return curve_points
-    end
-
+    
     #total pts 3k+1 for k segments
     num_segments = div(n_points - 1, 3)
 
     cache = zeros(PT, N_segments+1)
-    ti = (0:N_segments) * (1/N_segments) #reusable
+    ti = (0:N_segments) * (1/N_segments) #reusable for each segment
     for k in 0:(num_segments - 1)
         
         idx = 3 * k + 1
@@ -97,6 +88,14 @@ function sample_arc_length(segment::AbstractVector{PT}; samples_per_segment = 10
 end
 
 
+"""
+    create_arc_length_lut(control_points::Vector{PT}; samples_per_segment=50) where PT
+
+Precomputes for each cubic segment in control_points the arclength corresponding to the parameter value.
+Return a lut and the total length of the curve.
+The lut is a named tuple with 3 fields: 'index' (corresponding segment), 'tval' - parameter value and 'length' - the arclength
+The 'length' field is cumulative!
+"""
 function create_arc_length_lut(control_points::Vector{PT}; samples_per_segment=50) where PT
     lut = (;index = [1], tval = [0.0], length = [0.0])
     
@@ -195,7 +194,7 @@ end
 
 function remove_bezier_segment!(vertices, mousepos)
     
-    length(vertices) <= 4 && return nothing #
+    length(vertices) <= 4 && return nothing #don't delete when just 1 segment
     Q, i1, i2 = find_closest_main_segment_horizontal(vertices, mousepos)
     @info "mousepos", mousepos, " Q ", Q, "i1", i1, "i2", i2
     deleteat!(vertices, (i1, i1+1, i2-1))
@@ -288,7 +287,8 @@ end
 
 
 function move_control_vertices!(vertices, idx, new_pos)
-    
+
+    PT = eltype(vertices)
     old_pos = vertices[idx]
     vertices[idx] = new_pos #move the vertex to new_pos
 
@@ -327,7 +327,7 @@ function move_control_vertices!(vertices, idx, new_pos)
         idnext = idx+2
     end
     L = norm(V-center)
-    vertices[idnext] = normalize(center - vertices[idx]) * L + center #preserve the segment length
+    vertices[idnext] = PT(normalize(center - vertices[idx]) * L + center) #preserve the segment length
     return nothing
 end
 
