@@ -95,12 +95,15 @@ function main(;
 
     push!(BigDataStore, :other_curve_plots => []) #holds the plot objects for other curves than the current
     #update when adding/ deleting or switching
+
+    status_text = Observable("Status")
+
     #######LAYOUT#######################################################################################################
 
 
     fig = Figure()
     
-    ax_img = Axis(fig[1,1], aspect = DataAspect())
+    ax_img = Axis(fig[1,1], aspect = DataAspect(), tellheight=  false, tellwidth = false)
     deregister_interaction!(ax_img, :rectanglezoom) #just gets in the way when dragging
 
     SIDEBAR = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
@@ -125,8 +128,9 @@ function main(;
                     padding = (10, 0, 0, 10),
                     tellwidth = false,
                     )
-    fig[0,1] = label_help
-
+    label_status = Label(fig, text = status_text)
+    fig[0,:] = label_help
+    fig[-1, :] = label_status
     
     #################### SCALE / GLOBAL ################################################################################
 
@@ -290,6 +294,7 @@ function main(;
         
         update_current_curve_controls!(curve_controls, nt)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
+        status_text[] = "Added new curve $new_name"
     end
 
     on(btn_rem_curve.clicks) do _
@@ -297,11 +302,15 @@ function main(;
         num_curves = length(BigDataStore[:ALL_CURVES])
         if num_curves >1
             id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
+            old_name = BigDataStore[:ALL_CURVES][id_delete].name
             deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
             rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
             BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
-            update_current_curve_controls!(curve_controls, BigDataStore[:ALL_CURVES][BigDataStore[:edited_curve_id][]])#we should also update the color etc...
-            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
+            update_current_curve_controls!(curve_controls, 
+                    BigDataStore[:ALL_CURVES][BigDataStore[:edited_curve_id][]])#we should also update the color etc...
+            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
+                                BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
+            status_text[] = "Removed curve $old_name"
         end
     end
 
@@ -313,19 +322,18 @@ function main(;
         
         
         BigDataStore[:edited_curve_id][] = s
-        #put the new data in
-        # @info "s", s
         cdata = BigDataStore[:ALL_CURVES][s]
 
         update_current_curve_controls!(curve_controls, cdata)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
+        status_text[] = "Editing curve $(cdata.name)"
     end
 
     
 
     on(tb_curve_name.stored_string) do s
         id = BigDataStore[:edited_curve_id][]
-        
+        old_name = BigDataStore[:ALL_CURVES][id].name
         update_curve!(BigDataStore[:ALL_CURVES], id; name = s)
         #also update the menu entry
         opts = menu_curves.options[]
@@ -334,6 +342,7 @@ function main(;
         menu_curves.options[] = opts
 
         label_curve_name.text[] = "Current curve: $s"
+        status_text[] = "Changed curve from $old_name to $s"
     end
 
     on(BigDataStore[:current_color]) do c
@@ -346,13 +355,14 @@ function main(;
             
             v = parse(Float64, s)
             BigDataStore[:plot_range][][i] = v
-            @info "plot range:", BigDataStore[:plot_range][]
+            #@info "plot range:", BigDataStore[:plot_range][]
+            status_text[] = "plot range: $(BigDataStore[:plot_range][])"
         end
     end
 
     for (i, cb) in enumerate((cblogx, cblogy))
         on(cb.checked) do val
-            @info "checked"
+            
             st = val ? :log : :linear
             BigDataStore[:scale_type][][i] = st
         end
@@ -378,10 +388,11 @@ function main(;
             tb_curve_name.placeholder = "Curve 01"
             BigDataStore[:edited_curve_id][] = 1
             switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 1, BigDataStore[:other_curve_plots])   
-            reset_limits!(ax_img)     
+            reset_limits!(ax_img)  
+            status_text[] = "New image imported!"   
         catch e
-            @info "Probably not an image?"
-            
+            # @info "Probably not an image?"
+            status_text = "Cannot open this file. Probably not an image?"
         end
         
     end
@@ -391,6 +402,7 @@ function main(;
         n = 10
         try n = parse(Int, s); catch; end
         BigDataStore[:num_export][] = max(10, n)
+        status_text[] = "Curve export density = $n points"
     end
 
     on(btn_export.clicks) do _
@@ -400,8 +412,8 @@ function main(;
         for i in 1:2
             if BigDataStore[:scale_type][][i] == :log
                 if BigDataStore[:plot_range][][2i-1] <= 0 || BigDataStore[:plot_range][][2i] <= 0 
-                    @info "Cannot export, log scaling needs positive numbers.\n
-                    Please set the X1, X2, Y1 or Y2 to be positive!"
+                    status_text[] =  "Cannot export, log scaling needs positive numbers.\n
+                                    Please set the X1, X2, Y1 or Y2 to be positive!"
                     return nothing
                 end
             end
@@ -414,7 +426,7 @@ function main(;
                     format, 
                     export_folder = BigDataStore[:export_folder],
                     )
-
+        status_text[] = "Exported files!"
     end
     #####################MOUSE Interaction##############################################################################
     
@@ -666,7 +678,7 @@ function switch_other_curves_plot!(ax, all_curves, id, plot_handles)
     end
     #gather new curves to plot
     ids = filter(i -> i!=id, eachindex(all_curves))
-    @info "ids", ids, "id", id
+    # @info "ids", ids, "id", id
     if !isnothing(ids)
         for i in ids
             crv = all_curves[i]
