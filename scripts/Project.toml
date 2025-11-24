@@ -1,2 +1,5 @@
 [deps]
 YetAnotherPlotDigitizer = "e2b36d35-08f8-4606-b6fb-bb58ec6d10e6"
+
+[sources]
+YetAnotherPlotDigitizer = {path = ".."}

@@ -46,37 +46,41 @@ function main(;
             ClosePath(),
                     ])
 
+
+    BigDataStore = Dict{Symbol, Any}() #holds everything
+
     #colors
-    cmap = distinguishable_colors(num_colors, rand(RGB)) #color map for curves
-    current_color = Observable(first(cmap)) 
+    push!(BigDataStore, :cmap => distinguishable_colors(num_colors, rand(RGB))) #color map for curves
+    push!(BigDataStore, :current_color => Observable(first(BigDataStore[:cmap]))) 
 
     is_colorgrid_visible = Observable(false)
 
 
     #this is the reference image which is "digitized"
-    ref_img = Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480))
+    push!(BigDataStore, :ref_img => Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480)))
     
     
 
     #scaling range markers
     PZ=  zero(Point2f)
-    scale_rect = Observable([PZ, PZ, PZ, PZ]) #initialize
-    reset_marker_positions!(size(ref_img[]), scale_rect) #set to default positions
-    scale_type = Observable([:linear, :linear])
+    push!(BigDataStore, :scale_rect => Observable([PZ, PZ, PZ, PZ])) #initialize
+    reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
+
+    push!(BigDataStore, :scale_type => Observable([:linear, :linear]))
 
     
     
 
-    current_curve = Observable(get_initial_curve_pts(scale_rect[]))#the current active curve
-    ntinit = (;name= "Curve 01", color = current_color[], points = current_curve[])
-    ALL_CURVES = [ntinit] #holds all the curves
+    push!(BigDataStore, :current_curve => Observable(get_initial_curve_pts(BigDataStore[:scale_rect][])))#the current active curve
+    ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][])
+    push!(BigDataStore, :ALL_CURVES => [ntinit]) #holds all the curves
 
-    plot_range = Observable([0.0, 1.0, 0.0, 1.0]) #scaling ranges x1, x2, y1, y2
+    push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
 
 
     #hi res sampling of the current curve
-    bezier_curve = lift(current_curve) do pts
-        curve = piecewise_cubic_bezier(pts; N_segments = 50)
+    bezier_curve = lift(BigDataStore[:current_curve]) do pts
+        piecewise_cubic_bezier(pts; N_segments = 50)
     end
 
 
@@ -84,12 +88,12 @@ function main(;
     dragged_index = -1 #index to the closest vertex
     target_observable = nothing # ctrl_scatter or scal
 
-    edited_curve_id = Observable(1)
+    push!(BigDataStore, :edited_curve_id => Observable(1))
 
-    num_export = Observable(100) #how many points per curve to export
-    export_folder = nothing
+    push!(BigDataStore, :num_export => Observable(100)) #how many points per curve to export
+    push!(BigDataStore, :export_folder => nothing)
 
-    other_curve_plots = [] #holds the plot objects for other curves than the current
+    push!(BigDataStore, :other_curve_plots => []) #holds the plot objects for other curves than the current
     #update when adding/ deleting or switching
     #######LAYOUT#######################################################################################################
 
@@ -128,7 +132,7 @@ function main(;
 
 
     tbscale = [Textbox(fig, width = sidebar_width/3, validator = Float64, 
-                            placeholder = "$(plot_range[][i])") for i in 1:4]
+                            placeholder = "$(BigDataStore[:plot_range][][i])") for i in 1:4]
     cblogx = Checkbox(fig, checked=false)
     cblogy = Checkbox(fig, checked=false)
     SCALE_GL[1,1] = Label(fig, "Scale")
@@ -173,14 +177,14 @@ function main(;
                         height = color_btn_height,
                         )
 
-    CURRENT_CURVE_GL[2,1] = hgrid!(btn_color, Box(fig, color = current_color, width = 0.4 * sidebar_width))
+    CURRENT_CURVE_GL[2,1] = hgrid!(btn_color, Box(fig, color = BigDataStore[:current_color], width = 0.4 * sidebar_width))
     CC_COLOR_GL[1,1] = empty_layout
 
     HIDDEN_GL[1,1] = color_option_grid
     populate_color_chooser(fig,
                       color_option_grid, 
-                      cmap, 
-                      current_color, 
+                      BigDataStore[:cmap], 
+                      BigDataStore[:current_color], 
                       is_colorgrid_visible; 
                       btn_height = color_btn_height,
                       num_color_cols,
@@ -190,13 +194,13 @@ function main(;
 
     ########################PLOTS#######################################################################################
 
-    img_plot = image!(ax_img, ref_img)
-    scaling_pts = (scatter!(ax_img, scale_rect, color = [:red, :red, :green, :green], 
+    img_plot = image!(ax_img, BigDataStore[:ref_img])
+    scaling_pts = (scatter!(ax_img, BigDataStore[:scale_rect], color = [:red, :red, :green, :green], 
                                 marker = RingBarMarker,
                                 markersize = PICK_THRESHOLD/2,
                                 rotation = [0, 0, pi/2, pi/2]),
 
-    text!(ax_img, scale_rect; text =["X1", "X2", "Y1", "Y2"],
+    text!(ax_img, BigDataStore[:scale_rect]; text =["X1", "X2", "Y1", "Y2"],
                         color = [:red, :red, :green, :green],
                         # color = :black,
                         fontsize = PICK_THRESHOLD/2,
@@ -204,14 +208,15 @@ function main(;
                         )
     )
     
-    lines!(ax_img, bezier_curve, color = current_color, linewidth = 4, label = "Curve 01")# final Bézier curve
+    lines!(ax_img, bezier_curve, color = BigDataStore[:current_color], linewidth = 4, label = "Curve 01")# final Bézier curve
 
     
-    lines!(ax_img, current_curve, color = (:grey, 0.5), linestyle = :dash)
+    lines!(ax_img, BigDataStore[:current_curve], color = (:grey, 0.5), linestyle = :dash)
 
     #control pts
-    ctlr_colors = @lift map(i -> is_main_vertex($current_curve, i) ? :blue : :red, eachindex($current_curve))
-    ctrl_scatter = scatter!(ax_img, current_curve, 
+    CC = BigDataStore[:current_curve]
+    ctlr_colors = @lift map(i -> is_main_vertex($CC, i) ? :blue : :red, eachindex($CC))
+    ctrl_scatter = scatter!(ax_img, BigDataStore[:current_curve], 
                         markersize = PICK_THRESHOLD, 
                         color = ctlr_colors, 
                         strokecolor = :black, 
@@ -220,7 +225,7 @@ function main(;
                         )
 
 
-    curve_controls = [tb_curve_name, current_color, current_curve, label_curve_name]
+    curve_controls = [tb_curve_name, BigDataStore[:current_color], BigDataStore[:current_curve], label_curve_name]
 
     #############BOTTOM#################################################################################################
 
@@ -268,64 +273,60 @@ function main(;
     on(btn_add_curve.clicks) do _
         
         #just add a new curve 
-        inext= length(ALL_CURVES)+1
+        inext= length(BigDataStore[:ALL_CURVES])+1
         new_name = "Curve $inext"
-        pts = get_initial_curve_pts(scale_rect[])
+        pts = get_initial_curve_pts(BigDataStore[:scale_rect][])
         
 
         next_color_id = mod(inext, num_colors) + 1
-        new_color = cmap[next_color_id]
+        new_color = BigDataStore[:cmap][next_color_id]
         nt = (;name = new_name,
                color = new_color,
                points= pts)     
         
-        push!(ALL_CURVES, nt)
-        edited_curve_id[] = inext
-        rebuild_menu_options!(menu_curves, ALL_CURVES)
-        # @info "colors before", [c.color for c in ALL_CURVES]
+        push!(BigDataStore[:ALL_CURVES], nt)
+        BigDataStore[:edited_curve_id][] = inext
+        rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+        
         update_current_curve_controls!(curve_controls, nt)
-        # @info "colors after", [c.color for c in ALL_CURVES]
-        #also update 
-        
-        
-        switch_other_curves_plot!(ax_img, ALL_CURVES, inext, other_curve_plots)
+        switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
     end
 
     on(btn_rem_curve.clicks) do _
         #remove the current curve
-        num_curves = length(ALL_CURVES)
+        num_curves = length(BigDataStore[:ALL_CURVES])
         if num_curves >1
-            id_delete = edited_curve_id[]#delete the current curve
-            deleteat!(ALL_CURVES, id_delete[])
-            rebuild_menu_options!(menu_curves, ALL_CURVES)
-            edited_curve_id[] = lastindex(ALL_CURVES)#set the current curve to the last in the list
-            update_current_curve_controls!(curve_controls, ALL_CURVES[edited_curve_id[]])#we should also update the color etc...
-            switch_other_curves_plot!(ax_img, ALL_CURVES, edited_curve_id[], other_curve_plots)
+            id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
+            deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
+            rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+            BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
+            update_current_curve_controls!(curve_controls, BigDataStore[:ALL_CURVES][BigDataStore[:edited_curve_id][]])#we should also update the color etc...
+            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
         end
     end
 
 
     on(menu_curves.selection) do s
-        if edited_curve_id[] == s || isnothing(s)
+        if BigDataStore[:edited_curve_id][] == s || isnothing(s)
             return nothing
         end
         
         
-        edited_curve_id[] = s
+        BigDataStore[:edited_curve_id][] = s
         #put the new data in
         # @info "s", s
-        cdata = ALL_CURVES[s]
+        cdata = BigDataStore[:ALL_CURVES][s]
 
         update_current_curve_controls!(curve_controls, cdata)
-        switch_other_curves_plot!(ax_img, ALL_CURVES, s, other_curve_plots)
+        switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
     end
 
     
 
     on(tb_curve_name.stored_string) do s
-        id = edited_curve_id[]
+        id = BigDataStore[:edited_curve_id][]
         
-        update_curve!(ALL_CURVES, id; name = s)
+        update_curve!(BigDataStore[:ALL_CURVES], id; name = s)
         #also update the menu entry
         opts = menu_curves.options[]
         # @info "opts", opts
@@ -335,17 +336,17 @@ function main(;
         label_curve_name.text[] = "Current curve: $s"
     end
 
-    on(current_color) do c
+    on(BigDataStore[:current_color]) do c
         
-        update_curve!(ALL_CURVES, edited_curve_id[]; color= c)
+        update_curve!(BigDataStore[:ALL_CURVES], BigDataStore[:edited_curve_id][]; color= c)
     end
 
     for (i, tb) in enumerate(tbscale)
         on(tb.stored_string) do s
             
             v = parse(Float64, s)
-            plot_range[][i] = v
-            @info "plot range:", plot_range[]
+            BigDataStore[:plot_range][][i] = v
+            @info "plot range:", BigDataStore[:plot_range][]
         end
     end
 
@@ -353,7 +354,7 @@ function main(;
         on(cb.checked) do val
             @info "checked"
             st = val ? :log : :linear
-            scale_type[][i] = st
+            BigDataStore[:scale_type][][i] = st
         end
     end
 
@@ -362,21 +363,21 @@ function main(;
         isempty(files) && return nothing
         
         f1 = first(files)
-        export_folder = dirname(f1)
+        BigDataStore[:export_folder] = dirname(f1)
         println(f1)
         try
-            ref_img[] = rotr90(load(f1))
+            BigDataStore[:ref_img][] = rotr90(load(f1))
             #reset most state 
-            if length(ALL_CURVES)>=2 #drop all but the 1st curve
-                deleteat!(ALL_CURVES, 2:length(ALL_CURVES))
+            if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
+                deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
             end
-            ALL_CURVES[1] =ntinit #put the initial simple curve into the 1st slot
-            reset_marker_positions!(size(ref_img[]), scale_rect)
-            current_curve[] = get_initial_curve_pts(scale_rect[])
+            BigDataStore[:ALL_CURVES][1] =ntinit #put the initial simple curve into the 1st slot
+            reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
+            BigDataStore[:current_curve][] = get_initial_curve_pts(BigDataStore[:scale_rect][])
             menu_curves.options[] = [("Curve 01", 1)]
             tb_curve_name.placeholder = "Curve 01"
-            edited_curve_id[] = 1
-            switch_other_curves_plot!(ax_img, ALL_CURVES, 1, other_curve_plots)   
+            BigDataStore[:edited_curve_id][] = 1
+            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 1, BigDataStore[:other_curve_plots])   
             reset_limits!(ax_img)     
         catch e
             @info "Probably not an image?"
@@ -389,29 +390,29 @@ function main(;
     on(tb_export_num.stored_string) do s
         n = 10
         try n = parse(Int, s); catch; end
-        num_export[] = max(10, n)
+        BigDataStore[:num_export][] = max(10, n)
     end
 
     on(btn_export.clicks) do _
-        N = num_export[]
+        N = BigDataStore[:num_export][]
         format = menu_export.selection[]
         #check if the are negative numbers when log scale range
         for i in 1:2
-            if scale_type[][i] == :log
-                if plot_range[][2i-1] <= 0 || plot_range[][2i] <= 0 
+            if BigDataStore[:scale_type][][i] == :log
+                if BigDataStore[:plot_range][][2i-1] <= 0 || BigDataStore[:plot_range][][2i] <= 0 
                     @info "Cannot export, log scaling needs positive numbers.\n
                     Please set the X1, X2, Y1 or Y2 to be positive!"
                     return nothing
                 end
             end
         end
-        export_curves(ALL_CURVES, 
-                    scale_rect[], 
-                    plot_range[], 
-                    scale_type[];
+        export_curves(BigDataStore[:ALL_CURVES], 
+                    BigDataStore[:scale_rect][], 
+                    BigDataStore[:plot_range][], 
+                    BigDataStore[:scale_type][];
                     N, 
                     format, 
-                    export_folder,
+                    export_folder = BigDataStore[:export_folder],
                     )
 
     end
@@ -427,14 +428,14 @@ function main(;
             #manual priority
 
             #try the scaling pts
-            idx = find_closest_point_to_position(scale_rect[], mousepos; PICK_THRESHOLD, area= :square)
+            idx = find_closest_point_to_position(BigDataStore[:scale_rect][], mousepos; PICK_THRESHOLD, area= :square)
             if idx !=-1
                  target_observable = scaling_pts
                  dragged_index = idx
                  return Consume(true)   
             end
             
-            idx = find_closest_point_to_position(current_curve[], mousepos; PICK_THRESHOLD, area= :square)
+            idx = find_closest_point_to_position(BigDataStore[:current_curve][], mousepos; PICK_THRESHOLD, area= :square)
             if idx != -1
                 target_observable = ctrl_scatter
                 dragged_index = idx
@@ -453,15 +454,15 @@ function main(;
             
             if target_observable === scaling_pts
                
-                current_points = scale_rect[]
+                current_points = BigDataStore[:scale_rect][]
                 current_points[dragged_index[]] = new_data_pos
-                scale_rect[] = current_points # Notify the Observable of the change
+                BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
                 return Consume(true)
             end
             if target_observable === ctrl_scatter
-                current_points = current_curve[]
+                current_points = BigDataStore[:current_curve][]
                 move_control_vertices!(current_points, dragged_index[], new_data_pos)
-                current_curve[] = current_points # Notify the Observable of the change
+                BigDataStore[:current_curve][] = current_points # Notify the Observable of the change
                 return Consume(true)
             end
             
@@ -474,7 +475,9 @@ function main(;
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index = -1
-            update_curve!(ALL_CURVES, edited_curve_id[]; points = current_curve[])
+            update_curve!(BigDataStore[:ALL_CURVES], 
+                          BigDataStore[:edited_curve_id][]; 
+                          points = BigDataStore[:current_curve][])
         end
         return Consume(false)
     end
@@ -482,7 +485,7 @@ function main(;
 
     on(events(ax_img).keyboardbutton, priority = 10) do event
         if event.action == Keyboard.press
-            current_points = current_curve[]
+            current_points = BigDataStore[:current_curve][]
             
             if event.key == Keyboard.a # Add point
                 # Check if we have a valid mouse position in data coordinates
@@ -490,13 +493,13 @@ function main(;
                 
                 add_bezier_segment!(current_points, data_pos)
                 # @info "current_points",current_points
-                current_curve[] = current_points
+                BigDataStore[:current_curve][] = current_points
                 return Consume(true)
             
             elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
                 data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
                 remove_bezier_segment!(current_points, data_pos)
-                current_curve[] = current_points
+                BigDataStore[:current_curve][] = current_points
             end
             
         end
