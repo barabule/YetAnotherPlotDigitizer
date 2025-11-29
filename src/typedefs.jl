@@ -15,3 +15,18 @@ function ScaleType(s::Symbol)
         error("s must be either :linear or :log")
     end
 end
+
+
+abstract type ControlPointType end
+
+struct SharpControlPoint<:ControlPointType
+    PT::Point2f
+end
+
+struct SmoothControlPoint<:ControlPointType
+    PT::Point2f
+end
+
+struct HandlePoint<:ControlPointType
+    PT::Point2f
+end
