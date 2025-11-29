@@ -25,6 +25,15 @@ function main(;
                     ])
 
 
+    HollowCircle = BezierPath([
+        MoveTo(Point(0.5, 0)),
+        EllipticalArc(Point(0,0), 0.5, 0.5, 0, 0, 2pi),
+        MoveTo(Point(0.4, 0)),
+        EllipticalArc(Point(0,0), 0.4, 0.4, 0, 0, -2pi),
+        ClosePath()
+    ])
+
+
     BigDataStore = Dict{Symbol, Any}() #holds everything
 
     #colors
@@ -197,13 +206,14 @@ function main(;
 
     #control pts
     CC = BigDataStore[:current_curve]
-    ctlr_colors = @lift map(i -> is_main_vertex($CC, i) ? :blue : :red, eachindex($CC))
+    ctlr_colors = @lift map(i -> is_main_vertex($CC, i) ? :blue : :grey, eachindex($CC))
+    # ctlr_markers =@lift map(i -> is_main_vertex($C, i) ? HollowCircle : :)
     ctrl_scatter = scatter!(ax_img, BigDataStore[:current_curve], 
-                        markersize = PICK_THRESHOLD, 
+                        markersize = 1*PICK_THRESHOLD, 
                         color = ctlr_colors, 
                         strokecolor = :black, 
                         strokewidth = 1, 
-                        marker = :circle, 
+                        marker = HollowCircle, 
                         )
 
 
