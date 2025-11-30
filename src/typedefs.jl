@@ -196,3 +196,18 @@ function find_closest_control_point_to_position(C::CubicBezierCurve, position)
     end
     return i_closest #index of control point in C.points
 end
+
+
+function toggle_smoothness(C::CubicBezierCurve, id)
+    @assert id in 1:length(C.points)
+
+    (id == 1 || id==length(C.points)) && return nothing
+
+    !is_control_point(id) && return nothing
+
+    CP = C.points[id]
+    new_CP = isa(CP, SharpControlPoint) ? SmoothControlPoint(CP.point) : SharpControlPoint(CP.point)
+    C.points[id] = new_CP
+
+    return nothing
+end
