@@ -32,6 +32,11 @@ struct HandlePoint<:ControlPointType #tangent handle pt
     point::Point2f #
 end
 
+
+struct CubicBezierCurve
+    points::Vector{ControlPointType} #ordering: CP handle handle CP handle handle etc
+end
+
 #is this needed
 # struct CubicBezierSegment
 #     CP_first<:ControlPointType
@@ -39,12 +44,8 @@ end
 #     handle_first::HandlePoint
 #     handle_second::HandlePoint
 # end
-
-struct CubicBezierCurve
-    points::Vector{ControlPointType} #ordering: CP handle handle CP handle handle etc
-end
-
 #segments(C)- iterator giving a each segment
+
 
 function number_of_segments(C::CubicBezierCurve)
     N = length(C.points)
@@ -174,14 +175,14 @@ end
 
 # util
 
-function find_closest_control_point_to(C::CubicBezierCurve, position)
+function find_closest_control_point_to_position(C::CubicBezierCurve, position)
 
     d_closest = Inf
     i_closest = -1
     points = C.points
     ids_cp = filter(i-> is_control_point(i), 1:length(points))
 
-    for (i, id_cp) in enumerate(ids_cp)
+    for id_cp in ids_cp
         d = norm(points[id_cp].point - position)
         if d < d_closest
             i_closest = id_cp
