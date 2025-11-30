@@ -37,15 +37,20 @@ struct CubicBezierCurve
     points::Vector{ControlPointType} #ordering: CP handle handle CP handle handle etc
 end
 
-#is this needed
-# struct CubicBezierSegment
-#     CP_first<:ControlPointType
-#     CP_second<:ControlPointType
-#     handle_first::HandlePoint
-#     handle_second::HandlePoint
-# end
-#segments(C)- iterator giving a each segment
-
+function CubicBezierCurve(pts::Vector{PT}) where PT
+    npts = length(pts)
+    #4-7-10-13-17 etc are valid lengths
+    nsegs = div(npts-1, 3)
+    ncurvepts = 3nsegs + 1 # <= npts
+    
+    CPTS = [SharpControlPoint(pts[1])] #first and last cpts are SharpControlPoint
+    for s in 1:nsegs
+        idx = 1 + 3(s-1)
+        last_CP = s==nsegs ? SharpControlPoint(Point2f(pts[idx+3])) : SmoothControlPoint(Point2f(pts[idx+3]))
+        push!(CPTS, HandlePoint(Point2f(pts[idx+1])), HandlePoint(Point2f(pts[idx+2])), last_CP)
+    end
+    return CubicBezierCurve(CPTS)
+end
 
 function number_of_segments(C::CubicBezierCurve)
     N = length(C.points)
