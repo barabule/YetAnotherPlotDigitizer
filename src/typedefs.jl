@@ -18,12 +18,13 @@ end
 
 
 abstract type ControlPointType end
+abstract type MainControlPoint <: ControlPointType end
 
-struct SharpControlPoint<:ControlPointType
+struct SharpControlPoint<:MainControlPoint
     point::Point2f 
 end
 
-struct SmoothControlPoint<:ControlPointType
+struct SmoothControlPoint<:MainControlPoint
     point::Point2f
 end
 
@@ -40,7 +41,7 @@ end
 # end
 
 struct CubicBezierCurve
-    points::Vector{Union{SharpControlPoint, SmoothControlPoint, HandlePoint}} #ordering: CP handle handle CP handle handle etc
+    points::Vector{ControlPointType} #ordering: CP handle handle CP handle handle etc
 end
 
 #segments(C)- iterator giving a each segment
@@ -52,28 +53,30 @@ function number_of_segments(C::CubicBezierCurve)
 end
 
 
-function add_control_point(C::CubicBezierCurve, 
-                        CP::ControlPointType, 
+function add_segment!(C::CubicBezierCurve,  
                         segment_id::Integer,
+                        CP::Union{MainControlPoint, Nothing}= nothing,
                         handle_first::Union{HandlePoint, Nothing} = nothing,
                         handle_second::Union{HandlePoint, Nothing} = nothing)
     @assert segment_id in 1:number_of_segments(C)
-    id_h1 = (segment_id-1) * 3 + 2
+    id_h1 = (segment_id-1) * 3 + 2 #index of the previous handle point
     #prev and next handles
     H1, H2 = C.points[id_h1].point, C.points[id_h1 + 1].point
     
     L12 = norm(H2 - H1)
     dir = (H2 - H1) / L12
-    
-    Hbefore = isnothing(handle_first) ? HandlePoint(CP - L12/4 * dir) : handle_first
-    Hafter = isnothing(handle_second) ? HandlePoint(CP + L12/4 * dir) : handle_second
+    CP = isnothing(CP) ? SmoothControlPoint(0.5 * H1 + 0.5 * H2) : CP #by default add a smooth pc
+    Hbefore = isnothing(handle_first) ? HandlePoint(CP.point - L12/4 * dir) : handle_first
+    Hafter = isnothing(handle_second) ? HandlePoint(CP.point + L12/4 * dir) : handle_second
 
-    new_points = vcat(points[1:idh1], Hbefore, CP, Hafter, points[id_h1+1:end])
-    return CubicBezierCurve(new_points)
+   
+    points = C.points
+    add_to_middle!(points, idh1+1, (Hbefore, CP, Hafter))
+    return nothing
 end
 
 
-function remove_segment(C::CubicBezierCurve, id::Integer)
+function remove_segment!(C::CubicBezierCurve, id::Integer)
     length(C.points)<=4 && return C
     NSegs = number_of_segments(C)
     @assert id in 1:NSegs
@@ -83,7 +86,7 @@ function remove_segment(C::CubicBezierCurve, id::Integer)
 
     pts = C.points
     deleteat!(pts, id_start:id_end)
-    return CubicBezierCurve(pts)
+    return nothing
 end
 
 function is_control_point(id::Integer)
@@ -103,28 +106,31 @@ end
 
 
 function move!(C::CubicBezierCurve, id::Integer, position::Point2f)
+
     NCP = length(C.points)
     @assert id in 1:NCP "Id ($id) must be within 1:$NCP"
+
     if is_control_point(id)
         move_CP!(C, id, position)
-        return nothing
+    else
+        i_CP, i_handle = get_attached_cp_and_handle(C, id)
+        move_handle!(C, (id, i_CP, i_handle), position, C.points[id])
     end
-    i_CP, i_handle = get_attached_cp_and_handle(C, id)
-    move_handle!(C, (id, i_CP, i_handle), position, C.points[id])
+    
     return nothing
 end
 
 function move_CP!(C::CubicBezierCurve, id, position) #move CP and attached handles
     
     CP = C.points[id]
-    move = position - CP.point
-    new_CP = typeof(CP)(move)
+    movedir = position - CP.point
+    new_CP = typeof(CP)(position)
     C.points[id] = new_CP
     if id!=1
-        H1 = HandlePoint(C.points[id-1].point + move)
+        H1 = HandlePoint(C.points[id-1].point + movedir)
         C.points[id-1] = H1
     elseif id != length(C.points)
-        H2 = HandlePoint(C.point[id+1].point + move)
+        H2 = HandlePoint(C.point[id+1].point + movedir)
         C.point[id+1] = H2
     end
     return nothing
@@ -149,4 +155,38 @@ function move_handle!(C::CubicBezierCurve, ids, position, ::HandlePoint)
 
 
     return nothing
+end
+
+
+#eval wrappers
+function piecewise_cubic_bezier(C::CubicBezierCurve; 
+                                N_segments = 50,
+                                )
+    PTS = [CP.point for CP in C.points]
+    piecewise_cubic_bezier(PTS; N_segments)
+end
+
+
+function sample_cubic_bezier_curve(C::CubicBezierCurve; samples = 100, lut_samples = 20)
+    PTS = [CP.point for CP in C.points]
+    return sample_cubic_bezier_curve(PTS; samples, lut_samples)
+end
+
+# util
+
+function find_closest_control_point_to(C::CubicBezierCurve, position)
+
+    d_closest = Inf
+    i_closest = -1
+    points = C.points
+    ids_cp = filter(i-> is_control_point(i), 1:length(points))
+
+    for (i, id_cp) in enumerate(ids_cp)
+        d = norm(points[id_cp].point - position)
+        if d < d_closest
+            i_closest = id_cp
+            d_closest = d
+        end
+    end
+    return i_closest #index of control point in C.points
 end
