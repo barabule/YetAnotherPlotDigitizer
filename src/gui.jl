@@ -49,35 +49,33 @@ function main(;
     ])
 
 
-    BigDataStore = Dict{Symbol, Any}() #holds everything
+    cmap = distinguishable_colors(num_colors, rand(RGB))
 
-    #colors
-    push!(BigDataStore, :cmap => distinguishable_colors(num_colors, rand(RGB))) #color map for curves
-    push!(BigDataStore, :current_color => Observable(first(BigDataStore[:cmap]))) 
-
-    is_colorgrid_visible = Observable(false)
-
-
-    #this is the reference image which is "digitized"
-    push!(BigDataStore, :ref_img => Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480)))
-    
-    
-
-    #scaling range markers
     PZ=  zero(Point2f)
-    push!(BigDataStore, :scale_rect => Observable([PZ, PZ, PZ, PZ])) #initialize
+    
+    is_colorgrid_visible = Observable(false)
+    
+    BigDataStore = Dict{Symbol, Any}(
+                    :cmap => cmap,#color map for curves
+                    :current_color => Observable(first(cmap)), #color of currently edited curve
+                    :ref_img => Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480)),
+                    :scale_rect => Observable([PZ, PZ, PZ, PZ]), #scaling range markers
+                    :scale_type => Observable([:linear, :linear]),
+                    :current_curve => Observable(get_initial_curve_pts(BigDataStore[:scale_rect][])), #control for current curve
+                    :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
+                    :edited_curve_id => Observable(1), #id of the current curve
+                    :num_export => Observable(100), #how many points per curve to export
+                    :export_folder => nothing, 
+                    :other_curve_plots => [], #holds the plot objects for other curves than the current
+    ) #holds everything
+    
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
 
-    push!(BigDataStore, :scale_type => Observable([:linear, :linear]))
-
     
-    
-
-    push!(BigDataStore, :current_curve => Observable(get_initial_curve_pts(BigDataStore[:scale_rect][])))#the current active curve
     ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][])
     push!(BigDataStore, :ALL_CURVES => [ntinit]) #holds all the curves
 
-    push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
+    # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
 
 
     #hi res sampling of the current curve
@@ -89,14 +87,6 @@ function main(;
     # Variables to store the state during a drag operation
     dragged_index = -1 #index to the closest vertex
     target_observable = nothing # ctrl_scatter or scal
-
-    push!(BigDataStore, :edited_curve_id => Observable(1))
-
-    push!(BigDataStore, :num_export => Observable(100)) #how many points per curve to export
-    push!(BigDataStore, :export_folder => nothing)
-
-    push!(BigDataStore, :other_curve_plots => []) #holds the plot objects for other curves than the current
-    #update when adding/ deleting or switching
 
     status_text = Observable("Status")
 
