@@ -33,6 +33,22 @@ function main(;
         ClosePath(),
     ])
 
+
+    HollowDiamondMarker = BezierPath([
+        MoveTo(Point(0.5, 0)),
+        LineTo(0, 0.5),
+        LineTo(-0.5, 0),
+        LineTo(0, -0.5),
+        LineTo(0.5, 0),
+        MoveTo(0.4, 0),
+        LineTo(0, -0.4),
+        LineTo(-0.4, 0),
+        LineTo(0, 0.4),
+        LineTo(0.4, 0),
+        ClosePath()
+    ])
+
+
     BigDataStore = Dict{Symbol, Any}() #holds everything
 
     #colors
