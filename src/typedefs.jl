@@ -20,120 +20,133 @@ end
 abstract type ControlPointType end
 
 struct SharpControlPoint<:ControlPointType
-    PT::Point2f #absolute
+    point::Point2f 
 end
 
 struct SmoothControlPoint<:ControlPointType
-    PT::Point2f #absolute
+    point::Point2f
 end
 
-struct HandlePoint<:ControlPointType #handle pt
-        PT::Point2f #relative -> vector
+struct HandlePoint<:ControlPointType #tangent handle pt
+    point::Point2f #
 end
 
-
-struct CubicBezierSegment
-    CP_first<:ControlPointType
-    CP_second<:ControlPointType
-    handle_first::HandlePoint
-    handle_second::HandlePoint
-end
+#is this needed
+# struct CubicBezierSegment
+#     CP_first<:ControlPointType
+#     CP_second<:ControlPointType
+#     handle_first::HandlePoint
+#     handle_second::HandlePoint
+# end
 
 struct CubicBezierCurve
-    segments::Vector{CubicBezierSegment}
+    points::Vector{Union{SharpControlPoint, SmoothControlPoint, HandlePoint}} #ordering: CP handle handle CP handle handle etc
+end
+
+#segments(C)- iterator giving a each segment
+
+function number_of_segments(C::CubicBezierCurve)
+    N = length(C.points)
+    # 4 -> 1s; 7->2; 10-> 3 etc
+    return div(N-1, 3)
 end
 
 
 function add_control_point(C::CubicBezierCurve, 
                         CP::ControlPointType, 
-                        id::Integer,
+                        segment_id::Integer,
                         handle_first::Union{HandlePoint, Nothing} = nothing,
                         handle_second::Union{HandlePoint, Nothing} = nothing)
-    #insert CP after control point id, cannot insert before 1...
-    @assert id in eachindex(C.segments) #CP will be added after CP[id]
-
-    segments = C.segments
-    this_seg = segments[id]
-    H1 = this_seg.CP_first + this_seg.handle_first #handle points
-    H2 = this_seg.CP_second + this_seg.handle_second
+    @assert segment_id in 1:number_of_segments(C)
+    id_h1 = (segment_id-1) * 3 + 2
+    #prev and next handles
+    H1, H2 = C.points[id_h1].point, C.points[id_h1 + 1].point
+    
     L12 = norm(H2 - H1)
-    dir = (H2 - H1) / L12 # direction vector from H1 to H2
-    h1 = isnothing(handle_first) ?  -dir * L12 / 4 : handle_first
-    h2 = isnothing(handle_second) ?  dir * L12 / 4 : handle_second
-    new_seg_before = CubicBezierSegment(this_seg.CP_first, CP, this_seg.handle_first, h1)
-    new_seg_after = CubicBezierSegment(CP, this_seg.CP_second, h2, this_seg.handle_second)
-    if length(segments) ==1
-        new_segments = [new_seg_before, new_seg_after]
-    elseif id>1 #at least 2 segment before
-        new_segments = vcat(segments[1:id-1], new_seg_before, new_seg_after, segments[i+1:end])
-    else #don't add the 1st portion
-        new_segments =vcat(new_seg_before, new_seg_after, segments[2:end])
-    end
-    return CubicBezierCurve(new_segments)
+    dir = (H2 - H1) / L12
+    
+    Hbefore = isnothing(handle_first) ? HandlePoint(CP - L12/4 * dir) : handle_first
+    Hafter = isnothing(handle_second) ? HandlePoint(CP + L12/4 * dir) : handle_second
+
+    new_points = vcat(points[1:idh1], Hbefore, CP, Hafter, points[id_h1+1:end])
+    return CubicBezierCurve(new_points)
 end
 
 
-function remove_control_point(C::CubicBezierCurve, id::Integer)
-    NCP = number_of_control_points(C)
-    @assert id in 1:NCP
+function remove_segment(C::CubicBezierCurve, id::Integer)
+    length(C.points)<=4 && return C
+    NSegs = number_of_segments(C)
+    @assert id in 1:NSegs
 
-    segments = C.segments
-    length(segments)<2 && return C #don;t delete the last segment
-    if id ==1 
-        deleteat!(segments, 1)
-        new_segments = segments
-    elseif id==NCP
-        deleteat!(segments, NCP-1)
-        new_segments = segments
-    else #we need to merge both segments sharing this CP
-        seg_before = segments[id-1] # cp_id-1 - cp_id
-        seg_after = segments[id] #cp_id - cp_id+1
-        new_segment = CubicBezierSegment( seg_before.CP_first, 
-                                        seg_after.CP_second,
-                                        seg_before.handle_first,
-                                        seg_after.handle_second)
-        new_segments = vcat(segments[1:id-1], new_segment, segments[id+1:end])
-    end
-    Cnew = CubicBezierCurve(new_segmens)
-    return Cnew
+    id_start = id==1 ? 1 : 3*(id-1)+1 #delete also the 1st cp if first  segment
+    id_end = id==NSegs ? id_start+4 : id_start+3 #delete also the last cp if last segment
 
+    pts = C.points
+    deleteat!(pts, id_start:id_end)
+    return CubicBezierCurve(pts)
 end
 
-function segment_points(s::CubicBezierSegment)
-
-    P1 = s.CP_first
-    P4 = s.CP_second
-    P2 = P1 + s.handle_first
-    P3 = P4 + s.handle_second
-    return (P1, P2, P3, P4)
+function is_control_point(id::Integer)
+    return mod(i,3)==1
 end
 
-function move_control_pt(C::CubicBezierCurve, id, new_position)
-    NCP = number_of_control_points(C)
-    @assert id in 1:NCP
-    return move_control_pt(C, id, C.segments[id].CP_first)
-end
-
-function move_control_pt(C::CubicBezierCurve, id::Integer, CP::SmoothControlPoint, new_position::Point2f)
-    new_CP = SmoothControlPoint(new_position)
-    # Cp id is shared between segments id-1 and id, both handles must be updated
-    segments = C.segments
-    if id<2
-        s1= segments[1]
-        segments[1] = CubicBezierSegment(CP, s1.CP_second, s1.handle_first, s1.handle_second)
-    elseif id==number_of_control_points(C)
-        slast = segments[id]
-        segments[id] = CubicBezierSegment(slast.CP_first, CP, slast.handle_first, slast.handle_second)
+function get_attached_cp_and_handle(C::CubicBezierCurve, id::Integer)
+    if is_control_point(id-1)
+        id_CP = id-1
+        id_handle = id-1 ==1 ? nothing : id-2
     else
-        sbefore = segments[id-1]
-        safter = segments[id]
-        segments[id-1] = CubicBezierSegment(sbefore.CP_first, CP, sbefore.handle_first, safter.handle_second)
-        segments[id] = CubicBezierSegment(CP, safter.CP_second, safter.handle_first, safter.handle_second)
+        id_CP = id+1
+        id_handle = id+1 == length(C.points) ? nothing : id + 2
     end
+    return (id_CP, id_handle)
 end
 
-# function move_control_pt(C::)
 
-function number_of_control_points(C::CubicBezierCurve)
-    return length(C.segments) + 1
+function move!(C::CubicBezierCurve, id::Integer, position::Point2f)
+    NCP = length(C.points)
+    @assert id in 1:NCP "Id ($id) must be within 1:$NCP"
+    if is_control_point(id)
+        move_CP!(C, id, position)
+        return nothing
+    end
+    i_CP, i_handle = get_attached_cp_and_handle(C, id)
+    move_handle!(C, (id, i_CP, i_handle), position, C.points[id])
+    return nothing
+end
+
+function move_CP!(C::CubicBezierCurve, id, position) #move CP and attached handles
+    
+    CP = C.points[id]
+    move = position - CP.point
+    new_CP = typeof(CP)(move)
+    C.points[id] = new_CP
+    if id!=1
+        H1 = HandlePoint(C.points[id-1].point + move)
+        C.points[id-1] = H1
+    elseif id != length(C.points)
+        H2 = HandlePoint(C.point[id+1].point + move)
+        C.point[id+1] = H2
+    end
+    return nothing
+end
+
+
+function move_handle!(C::CubicBezierCurve, ids, position, ::HandlePoint)
+    (id_this_handle, id_CP, id_other_handle) = ids
+    
+    
+    C.points[id_this_handle] = HandlePoint(position)
+    
+    isa(C.points[id_CP], SharpControlPoint) && return nothing#only move this handle  
+    
+    isnothing(id_other_handle) && return nothing # 1st or last CP    
+    
+    #if smooth, preserve the length of the other handle and make it parallel to this handle, leave the CP alone
+    handle_length_other = norm(C.points[id_CP].point - C.points[id_other_handle].point)
+    handle_dir = normalize(C.points[id_this_handle].point - C.points[id_CP].point)
+
+    C.points[id_other_handle] = HandlePoint( C.points[id_CP].point - handle_dir * handle_length_other)
+
+
+    return nothing
 end
