@@ -116,9 +116,23 @@ end
 
 function move_control_pt(C::CubicBezierCurve, id::Integer, CP::SmoothControlPoint, new_position::Point2f)
     new_CP = SmoothControlPoint(new_position)
-    
+    # Cp id is shared between segments id-1 and id, both handles must be updated
+    segments = C.segments
+    if id<2
+        s1= segments[1]
+        segments[1] = CubicBezierSegment(CP, s1.CP_second, s1.handle_first, s1.handle_second)
+    elseif id==number_of_control_points(C)
+        slast = segments[id]
+        segments[id] = CubicBezierSegment(slast.CP_first, CP, slast.handle_first, slast.handle_second)
+    else
+        sbefore = segments[id-1]
+        safter = segments[id]
+        segments[id-1] = CubicBezierSegment(sbefore.CP_first, CP, sbefore.handle_first, safter.handle_second)
+        segments[id] = CubicBezierSegment(CP, safter.CP_second, safter.handle_first, safter.handle_second)
+    end
 end
 
+# function move_control_pt(C::)
 
 function number_of_control_points(C::CubicBezierCurve)
     return length(C.segments) + 1
