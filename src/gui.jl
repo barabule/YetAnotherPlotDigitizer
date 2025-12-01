@@ -56,24 +56,31 @@ function main(;
     is_colorgrid_visible = Observable(false)
     
     BigDataStore = Dict{Symbol, Any}(
+                    # general
                     :cmap => cmap,#color map for curves
-                    :current_color => Observable(first(cmap)), #color of currently edited curve
+                    #img
                     :ref_img => Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480)),
+                    #scaling
                     :scale_rect => Observable([PZ, PZ, PZ, PZ]), #scaling range markers
                     :scale_type => Observable([:linear, :linear]),
-                    :current_curve => Observable(get_initial_curve_pts(BigDataStore[:scale_rect][])), #control for current curve
                     :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
-                    :edited_curve_id => Observable(1), #id of the current curve
+                    #export
                     :num_export => Observable(100), #how many points per curve to export
                     :export_folder => nothing, 
+                    #curve data
+                    :edited_curve_id => Observable(1), #id of the current curve
+                    :current_curve => nothing, #control for current curve
+                    :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
+                    :ALL_CURVES => [], #holds all curve data
     ) #holds everything
     
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
 
-    
+    BigDataStore[:current_curve] = Observable(get_initial_curve_pts(BigDataStore[:scale_rect][]))
+
     ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][])
-    push!(BigDataStore, :ALL_CURVES => [ntinit]) #holds all the curves
+    BigDataStore[:ALL_CURVES] = [ntinit]
 
     # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
 
@@ -287,6 +294,7 @@ function main(;
         update_current_curve_controls!(curve_controls, nt)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
         status_text[] = "Added new curve $new_name"
+        menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
     end
 
     on(btn_rem_curve.clicks) do _
