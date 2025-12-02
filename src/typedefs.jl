@@ -120,18 +120,17 @@ function add_segment!(C::CubicBezierCurve,
 end
 
 
-function remove_segment!(C::CubicBezierCurve, id::Integer)
-    length(C.points)<=4 && return C
-    NSegs = number_of_segments(C)
-    @assert id in 1:NSegs
+function remove_control_point!(C::CubicBezierCurve, cpid::Integer)
+    length(C.points) <=4 && return nothing
+    num_cp = number_of_segments(C) + 1
+    ptid = 3*(cpid-1)+1 #id of CP in points vector
+    id_start = cpid == 1 ? 1 : ptid-1
+    id_end = cpid == num_cp ? ptid : ptid + 1
 
-    id_start = id==1 ? 1 : 3*(id-1)+1 #delete also the 1st cp if first  segment
-    id_end = id==NSegs ? id_start+4 : id_start+3 #delete also the last cp if last segment
-
-    pts = C.points
-    deleteat!(pts, id_start:id_end)
-    cp_t = C.is_smooth
-    deleteat!(cp_t, id) #will not delete the last segment
+    points = C.points
+    deleteat!(points, id_start:id_end)
+    is_smooth = C.is_smooth
+    deleteat!(is_smooth, cpid)
     return nothing
 end
 

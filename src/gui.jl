@@ -293,100 +293,7 @@ function main(;
                 markersize = MARKER_SIZE,
                 color = :red)
 
-    #lame
-    # ctrl_scatter = scatter!(ax_img, CC[], 
-    #                         marker = HollowDiamondMarker, 
-    #                         color = :red, 
-    #                         markersize = MARKER_SIZE)
-
     
-    # Xs = map(p_vec -> p_vec[1], CC)
-    # Ys = map(p_vec -> p_vec[2], CC)
-
-    #1 doesn't work
-    # CC_markers = Observable([HollowDiamondMarker, :circle])
-    # CC_markersizes = Observable([MARKER_SIZE])
-    # CC_marker_colors = Observable([:red])
-    # # ctrl_scatter = scatter!(ax_img, [PZ, PZ])
-    # on(CC) do cc
-    #     CC_markers.val = map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex(cc))
-    #     CC_markersizes.val =  map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex(cc))
-    #     CC_marker_colors.val = map(i -> is_main_vertex(i) ? :red : :grey, eachindex(cc))
-    #     ctrl_scatter.font = "Fira Mono" #???
-    #     ctrl_scatter.font = "default"
-
-    #     GLMakie.update!(ctrl_scatter, cc, 
-    #                 marker = CC_markers[],
-    #                 markersize = CC_markersizes[],
-    #                 color = CC_marker_colors[],
-    #                  )
-        
-    # end
-
-    #2 does not work
-    # BigDataStore[:current_curve][] = CC[]
-    # CC_markers = @lift map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex($CC)) 
-    # CC_marker_sizes = @lift map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex($CC))
-    # CC_marker_colors = @lift map(i -> is_main_vertex(i) ? :red : :grey, eachindex($CC))
-
-    # CC_markers = map(Xs) do cc
-    #     # @info "markers", size(cc)
-    #     [is_main_vertex(i) ? HollowDiamondMarker : :circle for i in eachindex(cc)]
-    # end
-
-    # CC_marker_sizes = map(Xs) do cc
-    #     [is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE for i in eachindex(cc)]
-    # end
-
-    # CC_marker_colors = map(Xs) do cc
-    #     [is_main_vertex(i) ? :red : :grey for i in eachindex(cc)]
-    # end
-
-    # ctrl_scatter = Observable(scatter!(ax_img, CC[], 
-    #                                     marker = CC_markers[], 
-    #                                     markersize= CC_marker_sizes[], 
-    #                                     color = CC_marker_colors[],
-    #                         ))
-
-    # ctrl_scatter = lift(CC) do cc
-    #     delete!(ax_img, ctrl_scatter[]) # <-- this trigger zoom reset...
-    #     scatter!(ax_img, cc,
-    #             marker = CC_markers, 
-    #             markersize= CC_marker_sizes, 
-    #             color = CC_marker_colors,
-    #             )
-
-    # end
-
-    # ctrl_scatter = @lift begin
-    #     pts = $(BigDataStore[:current_curve])
-    #     markers = map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex(pts))
-    #     markersize = map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex(pts))
-    #     colors = map(i -> is_main_vertex(i) ? :red : :grey, eachindex(pts))
-
-    #     scatter!(ax_img, pts,
-    #                 marker = markers,
-    #                 color = colors, 
-    #                 markersize = markersize)
-    # end
-
-
-    # ctrl_scatter = @lift scatter!(ax_img, $CC, 
-    #                 marker = map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex($CC)), 
-    #                 markersize= map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex($CC)), 
-    #                 color = map(i -> is_main_vertex(i) ? :red : :grey, eachindex($CC)))
-
-    # onany(BigDataStore[:current_curve], CC_markers, CC_marker_colors, CC_marker_sizes) do cc, cc_m, cc_mc, cc_sz
-        
-    #     # CC_markers = map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex(cc)) 
-        
-    #     # CC_marker_sizes = map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex(cc))
-    #     # CC_marker_colors = map(i -> is_main_vertex(i) ? :red : :grey, eachindex(cc))
-
-    #     update!(ctrl_scatter, arg1 =cc, marker = cc_m, 
-    #                                     markersize = cc_sz,
-    #                                     color = cc_mc)
-    # end
 
     curve_controls = [tb_curve_name, BigDataStore[:current_color], BigDataStore[:current_curve], label_curve_name]
 
@@ -680,8 +587,8 @@ function main(;
             elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
                 data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
                 current_points = BigDataStore[:current_curve][]
-                segid = find_closest_segment(current_curve, data_pos)
-                remove_segment!(current_points, segid)
+                cpid = find_closest_control_point_to_position(current_points, data_pos)
+                remove_control_point!(current_points, cpid)
                 BigDataStore[:current_curve][] = current_points
 
             elseif event.key == Keyboard.s #toggle is_smooth of the closest CP
