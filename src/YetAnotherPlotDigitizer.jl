@@ -21,5 +21,10 @@ include("gui.jl")
 export main
 
 
+# include("minimal.jl")
+# export minimal_gui
+
+
+
 
 end # module YetAnotherPlotDigitizer
