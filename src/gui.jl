@@ -436,7 +436,7 @@ function main(;
         end
     end
 
-
+    ## TODO better reset
     on(events(fig).dropped_files) do files
         isempty(files) && return nothing
         
@@ -445,18 +445,31 @@ function main(;
         println(f1)
         try
             BigDataStore[:ref_img][] = rotr90(load(f1))
+            reset_limits!(ax_img) 
             #reset most state 
             if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
                 deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
             end
-            BigDataStore[:ALL_CURVES][1] =ntinit #put the initial simple curve into the 1st slot
             reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
+            
             BigDataStore[:current_curve][] = get_initial_curve_pts(BigDataStore[:scale_rect][])
-            menu_curves.options[] = [("Curve 01", 1)]
-            tb_curve_name.placeholder = "Curve 01"
+            
             BigDataStore[:edited_curve_id][] = 1
+
+            BigDataStore[:ALL_CURVES_GL][1] = (;name = "Curve 01", 
+                                            points = BigDataStore[:current_curve][].points,
+                                            color = BigDataStore[:current_color][],
+                                            is_smooth = BigDataStore[:current_curve][].is_smooth)
+
+            rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+            # BigDataStore[:ALL_CURVES][1] =ntinit #put the initial simple curve into the 1st slot
+            # reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
+            # BigDataStore[:current_curve][] = get_initial_curve_pts(BigDataStore[:scale_rect][])
+            # menu_curves.options[] = [("Curve 01", 1)]
+            # tb_curve_name.placeholder = "Curve 01"
+            
             switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 1, BigDataStore[:other_curve_plots])   
-            reset_limits!(ax_img)  
+             
             status_text[] = "New image imported!"   
         catch e
             # @info "Probably not an image?"
