@@ -26,7 +26,7 @@ function main(;
                     ])
 
 
-    HollowCirveMarker = BezierPath([
+    HollowCircleMarker = BezierPath([
         MoveTo(Point(0.5, 0)),
         EllipticalArc(Point(0, 0), 0.5, 0.5, 0, 0, 2pi),
         MoveTo(Point(0.4, 0.0)),
@@ -67,7 +67,7 @@ function main(;
                     :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
                     #plotting
                     :style_main_vertex_smooth =>(;markercolor = :red, 
-                                                marker = HollowCirveMarker, 
+                                                marker = HollowCircleMarker, 
                                                 markersize = MARKER_SIZE),
 
                     :style_main_vertex_sharp  => (;markercolor = :red, 
@@ -254,16 +254,52 @@ function main(;
                                     #
 
     
-    lines!(ax_img, CC, color = (:grey, 0.5), linestyle = :dash)
-
-    #control pts
     
 
+    #control pts
+    ctrl_lines = lines!(ax_img, CC, color = (:grey, 0.5), linestyle = :dash)
+
+    ### WORKAROUND
+
+    SmoothPoints = lift(BigDataStore[:current_curve]) do cc
+        idx_main_cp = filter(i -> is_main_vertex(i), eachindex(cc.points))
+        idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
+        cc.points[idx_main_cp[idx_smooth]]
+    end
+
+    SharpPoints = lift(BigDataStore[:current_curve]) do cc
+        idx_main_cp = filter(i -> is_main_vertex(i), eachindex(cc.points))
+        idx_sharp = filter(i -> !cc.is_smooth[i], eachindex(cc.is_smooth))
+        cc.points[idx_main_cp[idx_sharp]]
+    end
+
+    HandlePoints = lift(BigDataStore[:current_curve]) do cc
+        idx_handle_pts = filter(i -> !is_main_vertex(i), eachindex(cc.points))
+        cc.points[idx_handle_pts]
+    end
+
+    scatter!(ax_img, HandlePoints,
+                marker = :circle,
+                markersize = 0.8*MARKER_SIZE,
+                color = :grey)
+
+    scatter!(ax_img, SmoothPoints, 
+                marker = HollowCircleMarker,
+                markersize = MARKER_SIZE,
+                color = :red)
+
+    scatter!(ax_img, SharpPoints,
+                marker = HollowDiamondMarker,
+                markersize = MARKER_SIZE,
+                color = :red)
+
     #lame
-    ctrl_scatter = scatter!(ax_img, CC, 
-                            marker = HollowDiamondMarker, 
-                            color = :red, 
-                            markersize = MARKER_SIZE)
+    # ctrl_scatter = scatter!(ax_img, CC[], 
+    #                         marker = HollowDiamondMarker, 
+    #                         color = :red, 
+    #                         markersize = MARKER_SIZE)
+
+    
     # Xs = map(p_vec -> p_vec[1], CC)
     # Ys = map(p_vec -> p_vec[2], CC)
 
@@ -271,16 +307,20 @@ function main(;
     # CC_markers = Observable([HollowDiamondMarker, :circle])
     # CC_markersizes = Observable([MARKER_SIZE])
     # CC_marker_colors = Observable([:red])
-    # ctrl_scatter = scatter!(ax_img, [PZ, PZ])
+    # # ctrl_scatter = scatter!(ax_img, [PZ, PZ])
     # on(CC) do cc
     #     CC_markers.val = map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex(cc))
     #     CC_markersizes.val =  map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex(cc))
     #     CC_marker_colors.val = map(i -> is_main_vertex(i) ? :red : :grey, eachindex(cc))
+    #     ctrl_scatter.font = "Fira Mono" #???
+    #     ctrl_scatter.font = "default"
+
     #     GLMakie.update!(ctrl_scatter, cc, 
     #                 marker = CC_markers[],
     #                 markersize = CC_markersizes[],
     #                 color = CC_marker_colors[],
     #                  )
+        
     # end
 
     #2 does not work
@@ -574,7 +614,7 @@ function main(;
                                                 thresh = PICK_THRESHOLD, 
                                                 area= :square)
             if idx != -1
-                target_observable = ctrl_scatter
+                target_observable = ctrl_lines
                 dragged_index = idx
                 return Consume(true)
             end
@@ -596,7 +636,7 @@ function main(;
                 BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
                 return Consume(true)
             end
-            if target_observable === ctrl_scatter
+            if target_observable === ctrl_lines
                 current_points = BigDataStore[:current_curve][]
                 # move_control_vertices!(current_points, dragged_index[], new_data_pos)
                 move!(current_points, dragged_index, new_data_pos)
