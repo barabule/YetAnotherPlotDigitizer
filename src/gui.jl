@@ -101,7 +101,7 @@ function main(;
 
     BigDataStore[:current_curve] = Observable(CubicBezierCurve(get_initial_curve_pts(BigDataStore[:scale_rect][])))
 
-    ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][].points)
+    ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][].points, is_smooth=[false, false])
     BigDataStore[:ALL_CURVES] = [ntinit]
 
     # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
@@ -405,7 +405,8 @@ function main(;
         new_color = BigDataStore[:cmap][next_color_id]
         nt = (;name = new_name,
                color = new_color,
-               points= pts)     
+               points= pts,
+               is_smooth = [false, false])     
         
         push!(BigDataStore[:ALL_CURVES], nt)
         BigDataStore[:edited_curve_id][] = inext
@@ -443,7 +444,7 @@ function main(;
         
         BigDataStore[:edited_curve_id][] = s
         cdata = BigDataStore[:ALL_CURVES][s]
-
+        
         update_current_curve_controls!(curve_controls, cdata)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
         status_text[] = "Editing curve $(cdata.name)"
@@ -766,19 +767,22 @@ end
 
 function update_curve!(CRV, id; name = nothing,
                         color = nothing,
-                        points = nothing)
+                        points = nothing,
+                        is_smooth = nothing)
 
     @assert 0 < id <= length(CRV)
     nt = CRV[id]
     name = isnothing(name) ? nt.name : name
     color = isnothing(color) ? nt.color : color
     points = isnothing(points) ? nt.points : points
-    
+    is_smooth = isnothing(is_smooth) ? nt.is_smooth : is_smooth
+
     @assert typeof(name) == typeof(nt.name)
     @assert typeof(color) == typeof(nt.color)
     @assert typeof(points) == typeof(nt.points)
-    
-    CRV[id] = (;name, color, points)
+    @assert eltype(is_smooth) == eltype(is_smooth)
+    @assert length(is_smooth) == div(length(points)-1,3)+1 
+    CRV[id] = (;name, color, points, is_smooth)
 
 end
 
@@ -786,7 +790,7 @@ function update_current_curve_controls!(curve_controls, cdata)
     TB, current_color, current_curve, crv_label = curve_controls
     # TB.placeholder[] = cdata.name #this doesn't do anything
     current_color[] = cdata.color 
-    current_curve[] = cdata.points
+    current_curve[] = CubicBezierCurve(cdata.points, cdata.is_smooth)
     crv_label.text[] = "Current curve: $(cdata.name)"
     return nothing
 end
