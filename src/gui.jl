@@ -629,10 +629,8 @@ function main(;
                 # Check if we have a valid mouse position in data coordinates
                 data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
                 current_points = BigDataStore[:current_curve][]
-                # add_bezier_segment!(current_points, data_pos)
                 segid = find_closest_segment(current_points, data_pos)
                 add_segment!(current_points, segid)
-                # @info "current_points",current_points
                 BigDataStore[:current_curve][] = current_points
                 return Consume(true)
             
@@ -641,7 +639,13 @@ function main(;
                 current_points = BigDataStore[:current_curve][]
                 segid = find_closest_segment(current_curve, data_pos)
                 remove_segment!(current_points, segid)
-                # remove_bezier_segment!(current_points, data_pos)
+                BigDataStore[:current_curve][] = current_points
+
+            elseif event.key == Keyboard.s #toggle is_smooth of the closest CP
+                data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+                current_points = BigDataStore[:current_curve][]
+                cp_id = find_closest_control_point_to_position(current_points, data_pos)
+                toggle_smoothness(current_points, cp_id)
                 BigDataStore[:current_curve][] = current_points
             end
             

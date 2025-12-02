@@ -242,7 +242,21 @@ function toggle_smoothness(C::CubicBezierCurve, cp_id)
     
     @assert cp_id in eachindex(C.is_smooth)
     (cp_id == 1 || cp_id == lastindex(C.is_smooth)) && return nothing #don't modify 1st and last - always sharp
-    C.is_smooth[id] = !C_is_smooth[id]
+    C.is_smooth[cp_id] = !C.is_smooth[cp_id]
+    if C.is_smooth[cp_id] #reset tangency if smooth again
+        cp_pt_id = 3(cp_id-1) + 1
+        CP = C.points[cp_pt_id]
+
+        h1_id, h2_id = cp_pt_id - 1, cp_pt_id + 1
+        H11, H1 = C.points[h1_id-1], C.points[h1_id]
+        H2, H22 = C.points[h2_id], C.points[h2_id+1]
+        new_dir = normalize(H22 - H11)
+        l1, l2 = norm(CP - H1), norm(CP - H2)
+        
+        C.points[h1_id] = CP - new_dir * l1
+        C.points[h2_id] = CP + new_dir * l2
+    end
+    return nothing
 end
 
 function find_closest_point_to_position(C::CubicBezierCurve, position; thresh = 20, area= :square)
