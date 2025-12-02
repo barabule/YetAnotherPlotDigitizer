@@ -5,4 +5,4 @@ using YetAnotherPlotDigitizer
 # main(num_colors = 32, PICK_THRESHOLD = 20)
 main()
 
-
+# minimal_gui()
