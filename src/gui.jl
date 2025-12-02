@@ -99,16 +99,12 @@ function main(;
     
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
 
-    BigDataStore[:current_curve] = Observable(get_initial_curve_pts(BigDataStore[:scale_rect][]))
+    BigDataStore[:current_curve] = Observable(CubicBezierCurve(get_initial_curve_pts(BigDataStore[:scale_rect][])))
 
-    ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][])
+    ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][].points)
     BigDataStore[:ALL_CURVES] = [ntinit]
 
     # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
-
-
-    
-
 
     # Variables to store the state during a drag operation
     dragged_index = -1 #index to the closest vertex
@@ -237,9 +233,15 @@ function main(;
     
     #hi res sampling of the current curve
     
-    bezier_curve = lift(BigDataStore[:current_curve]) do pts
-        piecewise_cubic_bezier(pts; N_segments = 50)
+    CC = lift(BigDataStore[:current_curve]) do C
+        pts = C.points
     end
+
+    bezier_curve = @lift piecewise_cubic_bezier($CC; N_segments = 50)
+    # bezier_curve = lift(BigDataStore[:current_curve]) do CP
+    #     pts = CP.points
+    #     piecewise_cubic_bezier(pts; N_segments = 50)
+    # end
     cname = lift(BigDataStore[:edited_curve_id]) do id
         nt = BigDataStore[:ALL_CURVES][id]
         nt.name
@@ -252,10 +254,10 @@ function main(;
                                     #
 
     
-    lines!(ax_img, BigDataStore[:current_curve], color = (:grey, 0.5), linestyle = :dash)
+    lines!(ax_img, CC, color = (:grey, 0.5), linestyle = :dash)
 
     #control pts
-    CC = BigDataStore[:current_curve] 
+    
 
     #lame
     ctrl_scatter = scatter!(ax_img, CC, 
@@ -558,14 +560,18 @@ function main(;
             #manual priority
 
             #try the scaling pts
-            idx = find_closest_point_to_position(BigDataStore[:scale_rect][], mousepos; PICK_THRESHOLD, area= :square)
+            idx = find_closest_point_to_position(BigDataStore[:scale_rect][], mousepos; 
+                                                PICK_THRESHOLD, 
+                                                area= :square)
             if idx !=-1
                  target_observable = scaling_pts
                  dragged_index = idx
                  return Consume(true)   
             end
             
-            idx = find_closest_point_to_position(BigDataStore[:current_curve][], mousepos; PICK_THRESHOLD, area= :square)
+            idx = find_closest_point_to_position(BigDataStore[:current_curve][], mousepos; 
+                                                thresh = PICK_THRESHOLD, 
+                                                area= :square)
             if idx != -1
                 target_observable = ctrl_scatter
                 dragged_index = idx
@@ -591,7 +597,8 @@ function main(;
             end
             if target_observable === ctrl_scatter
                 current_points = BigDataStore[:current_curve][]
-                move_control_vertices!(current_points, dragged_index[], new_data_pos)
+                # move_control_vertices!(current_points, dragged_index[], new_data_pos)
+                move!(current_points, dragged_index, new_data_pos)
                 BigDataStore[:current_curve][] = current_points # Notify the Observable of the change
                 return Consume(true)
             end
@@ -607,7 +614,7 @@ function main(;
             dragged_index = -1
             update_curve!(BigDataStore[:ALL_CURVES], 
                           BigDataStore[:edited_curve_id][]; 
-                          points = BigDataStore[:current_curve][])
+                          points = BigDataStore[:current_curve][].points)
         end
         return Consume(false)
     end
@@ -622,7 +629,9 @@ function main(;
                 # Check if we have a valid mouse position in data coordinates
                 data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
                 current_points = BigDataStore[:current_curve][]
-                add_bezier_segment!(current_points, data_pos)
+                # add_bezier_segment!(current_points, data_pos)
+                segid = find_closest_segment(current_points, data_pos)
+                add_segment!(current_points, segid)
                 # @info "current_points",current_points
                 BigDataStore[:current_curve][] = current_points
                 return Consume(true)
@@ -630,7 +639,9 @@ function main(;
             elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
                 data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
                 current_points = BigDataStore[:current_curve][]
-                remove_bezier_segment!(current_points, data_pos)
+                segid = find_closest_segment(current_curve, data_pos)
+                remove_segment!(current_points, segid)
+                # remove_bezier_segment!(current_points, data_pos)
                 BigDataStore[:current_curve][] = current_points
             end
             

@@ -17,52 +17,62 @@ function ScaleType(s::Symbol)
 end
 
 
-abstract type ControlPointType end
-abstract type MainControlPoint <: ControlPointType end
+# abstract type ControlPointType end
+# abstract type MainControlPoint <: ControlPointType end
 
-struct SharpControlPoint<:MainControlPoint
-    data::Point2f 
-end
+# struct SharpControlPoint<:MainControlPoint
+#     # data::Point2f 
+# end
 
-struct SmoothControlPoint<:MainControlPoint
-    data::Point2f
-end
+# struct SmoothControlPoint<:MainControlPoint
+#     # data::Point2f
+# end
 
-struct HandlePoint<:ControlPointType #tangent handle pt
-    data::Point2f #
-end
+# struct HandlePoint<:ControlPointType #tangent handle pt
+#     # data::Point2f #
+# end
 
 # import Base: +, -, *, length, getindex, eltype
 
-Base.length(::ControlPointType) = 2
-Base.getindex(s::ControlPointType, i) = s[i]
-Base.eltype(::ControlPointType) = Float32
+# Base.length(::ControlPointType) = 2
+# Base.getindex(s::ControlPointType, i) = s[i]
+# Base.eltype(::ControlPointType) = Float32
 
-function Base.:+(a::M, b::M) where M<:ControlPointType
-    M(a.data + b.data)
-end
+# function Base.:+(a::M, b::M) where M<:ControlPointType
+#     M(a.data + b.data)
+# end
 
-function Base.:-(a::M, b::M) where M<:ControlPointType
-    M(a.data - b.data)
-end
+# function Base.:-(a::M, b::M) where M<:ControlPointType
+#     M(a.data - b.data)
+# end
 
-function Base.:+(a::M1, b::M2) where {M1<:ControlPointType, M2<:ControlPointType}
-    a.data + b.data
-end
+# function Base.:+(a::M1, b::M2) where {M1<:ControlPointType, M2<:ControlPointType}
+#     a.data + b.data
+# end
 
-function Base.:-(a::M1, b::M2) where {M1<:ControlPointType, M2<:ControlPointType}
-    a.data - b.data
-end
+# function Base.:-(a::M1, b::M2) where {M1<:ControlPointType, M2<:ControlPointType}
+#     a.data - b.data
+# end
+
+# #always returns a Point2f when operating on ControlPoints
+# Base.:*(s::Real, p::M) where {M<:ControlPointType} = s * p.data
+# Base.:/(p::M, s::Real) where {M<:ControlPointType} = p.data / s
+
+# Base.:+(a::M, b::Point2f) where {M<:ControlPointType} = a.data + b
 
 
-Base.:*(s::Real, p::M) where {M<:ControlPointType} = s * p.data
-Base.:/(p::M, s::Real) where {M<:ControlPointType} = p.data / s
-
-Base.:+(a::M, b::Point2f) where {M<:ControlPointType} = a.data + b
-
-
-struct CubicBezierCurve
-    points::Vector{ControlPointType} #ordering: CP handle handle CP handle handle etc
+struct CubicBezierCurve{PT<:Point2{<:Real}} 
+    points::Vector{PT} #ordering: CP handle handle CP handle handle etc
+    is_smooth::Vector{Bool}
+    
+    function CubicBezierCurve(pts::Vector, is_smooth::Vector{Bool})
+        npts = length(pts)  
+        num_CP = length(is_smooth)
+        @assert npts>=4 && mod(npts-1, 3)==0
+        @assert num_CP >= 2 && num_CP == div(npts-1, 3) + 1
+        PT = eltype(pts)
+        return new{PT}(pts, is_smooth)
+    end
 end
 
 
@@ -71,15 +81,10 @@ function CubicBezierCurve(pts::Vector{PT}) where PT
     #4-7-10-13-17 etc are valid lengths
     nsegs = div(npts-1, 3)
     nsegs >= 1 || return nothing
-    CPTS = Vector{Union{SharpControlPoint, SmoothControlPoint, HandlePoint}}(SharpControlPoint(pts[1]))
-    for idx in 1:nsegs
-        id = 3(idx-1)+1
-        P1 = HandlePoint(pts[id+1])
-        P2 = HandlePoint(pts[id+2])
-        P3 = id+3 == npts ? SharpControlPoint(pts[id+3]) : SmoothControlPoint(pts[id+3])
-        push!(CPTS, P1, P2, P3)
-    end
-    return CPTS
+    is_smooth = fill(true, nsegs+1)
+    is_smooth[1] = false
+    is_smooth[end] = false
+    return CubicBezierCurve(pts, is_smooth)
 end
 
 
@@ -89,26 +94,28 @@ function number_of_segments(C::CubicBezierCurve)
     return div(N-1, 3)
 end
 
-
+#TODO too many points generated
 function add_segment!(C::CubicBezierCurve,  
-                        segment_id::Integer,
-                        CP::Union{MainControlPoint, Nothing}= nothing,
-                        handle_first::Union{HandlePoint, Nothing} = nothing,
-                        handle_second::Union{HandlePoint, Nothing} = nothing)
+                        segment_id::Integer)
+
     @assert segment_id in 1:number_of_segments(C)
     id_h1 = (segment_id-1) * 3 + 2 #index of the previous handle data
     #prev and next handles
-    H1, H2 = C.points[id_h1].data, C.points[id_h1 + 1].data
+    H1, H2 = C.points[id_h1], C.points[id_h1 + 1]
     
-    L12 = norm(H2 - H1)
-    dir = (H2 - H1) / L12
-    CP = isnothing(CP) ? SmoothControlPoint(0.5 * H1 + 0.5 * H2) : CP #by default add a smooth pc
-    Hbefore = isnothing(handle_first) ? HandlePoint(CP.data - L12/4 * dir) : handle_first
-    Hafter = isnothing(handle_second) ? HandlePoint(CP.data + L12/4 * dir) : handle_second
+    # L12 = norm(H2 - H1)
+    # dir = (H2 - H1) / L12
+    CP = 0.5 * H1 + 0.5 * H2
+    Hbefore = 0.75 * H1 + 0.25 * H2
+    Hafter = 0.25 * H1 + 0.75 * H2
 
    
     points = C.points
-    add_to_middle!(points, idh1+1, (Hbefore, CP, Hafter))
+    add_to_middle!(points, id_h1, (Hbefore, CP, Hafter))
+    is_smooth = C.is_smooth
+    add_to_middle!(is_smooth, segment_id, (true))
+    # @info "segid", segment_id
+    # @info "N cp", number_of_segments(C)+1, "L is_sm", length(C.is_smooth)
     return nothing
 end
 
@@ -123,11 +130,13 @@ function remove_segment!(C::CubicBezierCurve, id::Integer)
 
     pts = C.points
     deleteat!(pts, id_start:id_end)
+    cp_t = C.is_smooth
+    deleteat!(cp_t, id) #will not delete the last segment
     return nothing
 end
 
 function is_control_point(id::Integer)
-    return mod(i,3)==1
+    return mod(id,3)==1
 end
 
 function get_attached_cp_and_handle(C::CubicBezierCurve, id::Integer)
@@ -142,7 +151,7 @@ function get_attached_cp_and_handle(C::CubicBezierCurve, id::Integer)
 end
 
 
-function move!(C::CubicBezierCurve, id::Integer, position::Point2f)
+function move!(C::CubicBezierCurve, id::Integer, position)
 
     NCP = length(C.points)
     @assert id in 1:NCP "Id ($id) must be within 1:$NCP"
@@ -151,7 +160,7 @@ function move!(C::CubicBezierCurve, id::Integer, position::Point2f)
         move_CP!(C, id, position)
     else
         i_CP, i_handle = get_attached_cp_and_handle(C, id)
-        move_handle!(C, (id, i_CP, i_handle), position, C.points[id])
+        move_handle!(C, (id, i_CP, i_handle), position)
     end
     
     return nothing
@@ -159,37 +168,38 @@ end
 
 function move_CP!(C::CubicBezierCurve, id, position) #move CP and attached handles
     
-    CP = C.points[id]
-    movedir = position - CP.data
-    new_CP = typeof(CP)(position)
-    C.points[id] = new_CP
+    PT = C.points[id]
+    movedir = position - PT
+    
+    C.points[id] = position
     if id!=1
-        H1 = HandlePoint(C.points[id-1].data + movedir)
+        H1 = C.points[id-1] + movedir
         C.points[id-1] = H1
     elseif id != length(C.points)
-        H2 = HandlePoint(C.data[id+1].data + movedir)
-        C.data[id+1] = H2
+        H2 = C.points[id+1] + movedir
+        C.points[id+1] = H2
     end
     return nothing
 end
 
 
-function move_handle!(C::CubicBezierCurve, ids, position, ::HandlePoint)
+function move_handle!(C::CubicBezierCurve, ids, position)
     (id_this_handle, id_CP, id_other_handle) = ids
     
     
-    C.points[id_this_handle] = HandlePoint(position)
+    C.points[id_this_handle] = position
     
-    isa(C.points[id_CP], SharpControlPoint) && return nothing#only move this handle  
+    #check if associated control point is smooth
+    cp_id = div(id_CP-1, 3) + 1
+    !C.is_smooth[cp_id] && return nothing#only move this handle  
     
     isnothing(id_other_handle) && return nothing # 1st or last CP    
     
     #if smooth, preserve the length of the other handle and make it parallel to this handle, leave the CP alone
-    handle_length_other = norm(C.points[id_CP].data - C.points[id_other_handle].data)
-    handle_dir = normalize(C.points[id_this_handle].data - C.points[id_CP].data)
+    handle_length_other = norm(C.points[id_CP] - C.points[id_other_handle])
+    handle_dir = normalize(C.points[id_this_handle] - C.points[id_CP])
 
-    C.points[id_other_handle] = HandlePoint( C.points[id_CP].data - handle_dir * handle_length_other)
-
+    C.points[id_other_handle] = C.points[id_CP] - handle_dir * handle_length_other
 
     return nothing
 end
@@ -199,14 +209,13 @@ end
 function piecewise_cubic_bezier(C::CubicBezierCurve; 
                                 N_segments = 50,
                                 )
-    PTS = [CP.data for CP in C.points]
-    piecewise_cubic_bezier(PTS; N_segments)
+    
+    piecewise_cubic_bezier(C.points; N_segments)
 end
 
 
 function sample_cubic_bezier_curve(C::CubicBezierCurve; samples = 100, lut_samples = 20)
-    PTS = [CP.data for CP in C.points]
-    return sample_cubic_bezier_curve(PTS; samples, lut_samples)
+    return sample_cubic_bezier_curve(C.points; samples, lut_samples)
 end
 
 # util
@@ -218,27 +227,60 @@ function find_closest_control_point_to_position(C::CubicBezierCurve, position)
     points = C.points
     ids_cp = filter(i-> is_control_point(i), 1:length(points))
 
-    for id_cp in ids_cp
-        d = norm(points[id_cp].data - position)
+    for (i, id_cp) in enumerate(ids_cp)
+        d = norm(points[id_cp] - position)
         if d < d_closest
-            i_closest = id_cp
+            i_closest = i
             d_closest = d
         end
     end
-    return i_closest #index of control data in C.points
+    return i_closest #index of cp in C.is_smooth
 end
 
 
-function toggle_smoothness(C::CubicBezierCurve, id)
-    @assert id in 1:length(C.points)
+function toggle_smoothness(C::CubicBezierCurve, cp_id)
+    
+    @assert cp_id in eachindex(C.is_smooth)
+    (cp_id == 1 || cp_id == lastindex(C.is_smooth)) && return nothing #don't modify 1st and last - always sharp
+    C.is_smooth[id] = !C_is_smooth[id]
+end
 
-    (id == 1 || id==length(C.points)) && return nothing
+function find_closest_point_to_position(C::CubicBezierCurve, position; thresh = 20, area= :square)
+    d_closest = Inf
+    i_closest = -1
+    points = C.points
+    
+    p = area == :square ? Inf : 2
+    for i in eachindex(points)
+        d = norm(points[i] - position, p)
+        if d < d_closest
+            i_closest = i
+            d_closest = d
+        end
+    end
+    d_closest > thresh && return -1
+    return i_closest 
+end
 
-    !is_control_point(id) && return nothing
 
-    CP = C.points[id]
-    new_CP = isa(CP, SharpControlPoint) ? SmoothControlPoint(CP.data) : SharpControlPoint(CP.data)
-    C.points[id] = new_CP
+function find_closest_segment(C::CubicBezierCurve, position)
+    cp_id = find_closest_control_point_to_position(C, position)
+    #check which side of the cp to return
+    
+    cp_id == 1 && return 1
+    nsegs = number_of_segments(C)
+    cp_id > nsegs && return nsegs #last CP
 
-    return nothing
+    #check which CP is closer
+    seg_before = cp_id-1
+    pt_id_CP_before = (seg_before-1) * 3 + 1
+    CP_bef = C.points[pt_id_CP_before]
+    d_bef = norm(CP_bef - position)
+    
+    seg_after  = cp_id
+    pt_id_CP_after = (seg_after -1) * 3 + 1
+    CP_after = C.points[pt_id_CP_after]
+    d_aft = norm(CP_after - position)
+
+    return d_bef<d_aft ? seg_before : seg_after
 end

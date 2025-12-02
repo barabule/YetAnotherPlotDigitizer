@@ -172,23 +172,23 @@ end
 
 
 function add_to_middle!(arr::Vector, idx, els)
+    #puts els into arr beginning at idx+1
     
-    @assert firstindex(arr)<= idx <= lastindex(arr)
+    # @assert firstindex(arr)<= idx <= lastindex(arr)
     T = eltype(arr)
     @assert eltype(els) == T
-    
-
-    if idx != lastindex(arr)
-        last = arr[idx:end]
-        deleteat!(arr,idx:length(arr))
-        push!(arr, els...)
-        push!(arr, last...)
-    elseif idx == lastindex
-        push!(arr, els...)
-    elseif idx== firstindex
+    L_arr = length(arr)
+    L_els = length(els)
+    if idx < firstindex(arr)
         pushfirst!(arr, els...)
+    elseif idx> lastindex(arr)
+        push!(arr, els...)
+    else
+        after = arr[idx+1:end]
+        deleteat!(arr, idx+1:lastindex(arr))
+        push!(arr, els..., after...)
     end
-
+    @assert length(arr) == L_arr + L_els
     return nothing
 end
 
