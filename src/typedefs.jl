@@ -157,6 +157,7 @@ function move!(C::CubicBezierCurve, id::Integer, position)
     @assert id in 1:NCP "Id ($id) must be within 1:$NCP"
 
     if is_control_point(id)
+        # @info "CP move", id
         move_CP!(C, id, position)
     else
         i_CP, i_handle = get_attached_cp_and_handle(C, id)
@@ -172,12 +173,16 @@ function move_CP!(C::CubicBezierCurve, id, position) #move CP and attached handl
     movedir = position - PT
     
     C.points[id] = position
-    if id!=1
+    # @info "id", id, "num_pts", length(C.points)
+    if id>1 #move preceding handle if not the 1st point
         H1 = C.points[id-1] + movedir
         C.points[id-1] = H1
-    elseif id != length(C.points)
+        # @info "moved pre"
+    end
+    if id<length(C.points) #move succeding handle if not the last point
         H2 = C.points[id+1] + movedir
         C.points[id+1] = H2
+        # @info "moved post"
     end
     return nothing
 end

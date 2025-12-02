@@ -600,6 +600,7 @@ function main(;
                 current_points = BigDataStore[:current_curve][]
                 # move_control_vertices!(current_points, dragged_index[], new_data_pos)
                 move!(current_points, dragged_index, new_data_pos)
+                # @info "moving PT", dragged_index, "num CP", length(current_points.points)
                 BigDataStore[:current_curve][] = current_points # Notify the Observable of the change
                 return Consume(true)
             end
