@@ -5,6 +5,7 @@ function main(;
         sidebar_width = 200,
         bottombar_height = 100,
         PICK_THRESHOLD = 20,
+        MARKER_SIZE = 20,
         )
 
     #######GLOBALS###########################
@@ -25,7 +26,7 @@ function main(;
                     ])
 
 
-    HollowCircleMarker = BezierPath([
+    HollowCirveMarker = BezierPath([
         MoveTo(Point(0.5, 0)),
         EllipticalArc(Point(0, 0), 0.5, 0.5, 0, 0, 2pi),
         MoveTo(Point(0.4, 0.0)),
@@ -64,6 +65,27 @@ function main(;
                     :scale_rect => Observable([PZ, PZ, PZ, PZ]), #scaling range markers
                     :scale_type => Observable([:linear, :linear]),
                     :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
+                    #plotting
+                    :style_main_vertex_smooth =>(;markercolor = :red, 
+                                                marker = HollowCirveMarker, 
+                                                markersize = MARKER_SIZE),
+
+                    :style_main_vertex_sharp  => (;markercolor = :red, 
+                                                marker = HollowDiamondMarker, 
+                                                markersize = MARKER_SIZE),
+
+                    :style_handles => (markercolor = :grey, 
+                                    marker = :circle, 
+                                    markersize = 0.7 * MARKER_SIZE,
+                                    linestyle = :dash,
+                                    color = :grey,
+                                    linewidth = 0.1 * MARKER_SIZE),
+
+                    :style_edited_curve => (;linestyle = :solid, 
+                                    linewidth = 0.2 * MARKER_SIZE),
+
+                    :style_stored_curves => (;linestyle = :solid, 
+                                    linewidth = 0.1 * MARKER_SIZE),
                     #export
                     :num_export => Observable(100), #how many points per curve to export
                     :export_folder => nothing, 
@@ -85,10 +107,7 @@ function main(;
     # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
 
 
-    #hi res sampling of the current curve
-    bezier_curve = lift(BigDataStore[:current_curve]) do pts
-        piecewise_cubic_bezier(pts; N_segments = 50)
-    end
+    
 
 
     # Variables to store the state during a drag operation
@@ -195,7 +214,9 @@ function main(;
                       )
 
 
-    ########################PLOTS#######################################################################################
+    ####################    PLOTS     ##################################################################################
+
+    
 
     img_plot = image!(ax_img, BigDataStore[:ref_img])
     scaling_pts = (scatter!(ax_img, BigDataStore[:scale_rect], color = [:red, :red, :green, :green], 
@@ -211,22 +232,36 @@ function main(;
                         )
     )
     
-    lines!(ax_img, bezier_curve, color = BigDataStore[:current_color], linewidth = 4, label = "Curve 01")# final Bézier curve
+    
+    #hi res sampling of the current curve
+    
+    bezier_curve = lift(BigDataStore[:current_curve]) do pts
+        piecewise_cubic_bezier(pts; N_segments = 50)
+    end
+    cname = lift(BigDataStore[:edited_curve_id]) do id
+        nt = BigDataStore[:ALL_CURVES][id]
+        nt.name
+    end
+    edited_curve_fine_plot = lines!(ax_img, bezier_curve, 
+                                    color = BigDataStore[:current_color], 
+                                    linewidth = BigDataStore[:style_edited_curve].linewidth,
+                                    linestyle = BigDataStore[:style_edited_curve].linestyle)
+                                    #
 
     
     lines!(ax_img, BigDataStore[:current_curve], color = (:grey, 0.5), linestyle = :dash)
 
     #control pts
     CC = BigDataStore[:current_curve]
-    ctlr_colors = @lift map(i -> is_main_vertex($CC, i) ? :blue : :grey, eachindex($CC))
-    ctrl_scatter = scatter!(ax_img, BigDataStore[:current_curve], 
-                        markersize = PICK_THRESHOLD, 
-                        color = ctlr_colors, 
-                        strokecolor = :black, 
-                        strokewidth = 1, 
-                        marker = HollowCircleMarker, 
-                        )
+    CC_markers = @lift map(i -> is_main_vertex(i) ? HollowDiamondMarker : :circle, eachindex($CC)) 
+    CC_marker_sizes =@lift map(i -> is_main_vertex(i) ? MARKER_SIZE : 0.8 * MARKER_SIZE, eachindex($CC))
+    CC_marker_colors = @lift map(i -> is_main_vertex(i) ? :red : :grey, eachindex($CC))
 
+    ctrl_scatter = scatter!(ax_img, CC, marker = CC_markers, 
+                                        markersize= CC_marker_sizes, 
+                                        color = CC_marker_colors)
+
+    
 
     curve_controls = [tb_curve_name, BigDataStore[:current_color], BigDataStore[:current_curve], label_curve_name]
 
@@ -428,7 +463,7 @@ function main(;
                     )
         status_text[] = "Exported files!"
     end
-    #####################MOUSE Interaction##############################################################################
+    ##################   MOUSE Interaction   ###########################################################################
     
     on(events(ax_img.scene).mousebutton, priority = 20) do event
         # Only react to left mouse button press
@@ -494,6 +529,7 @@ function main(;
         return Consume(false)
     end
 
+#################   KEYBOARD   #########################################################################################
 
     on(events(ax_img).keyboardbutton, priority = 10) do event
         if event.action == Keyboard.press

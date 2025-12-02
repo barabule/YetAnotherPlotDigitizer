@@ -339,3 +339,7 @@ function is_main_vertex(vertices, idx)
 end
 
 
+function is_main_vertex(idx)
+
+    return mod(idx,3) == 1
+end
