@@ -615,7 +615,8 @@ function main(;
             dragged_index = -1
             update_curve!(BigDataStore[:ALL_CURVES], 
                           BigDataStore[:edited_curve_id][]; 
-                          points = BigDataStore[:current_curve][].points)
+                          points = BigDataStore[:current_curve][].points,
+                          is_smooth = BigDataStore[:current_curve][].is_smooth)
         end
         return Consume(false)
     end
