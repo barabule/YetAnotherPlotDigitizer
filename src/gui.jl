@@ -136,7 +136,7 @@ function main(;
     BOTTOMBAR = GridLayout(fig[2,1], tellwidth =false, height = bottombar_height)#other stuff?
 
     
-    label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one.",
+    label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one, 's' to toggle sharp.",
                     fontsize= 16,
                     color = :grey10,
                     halign =:center,
@@ -402,7 +402,7 @@ function main(;
     on(tb_curve_name.stored_string) do s
         id = BigDataStore[:edited_curve_id][]
         old_name = BigDataStore[:ALL_CURVES][id].name
-        update_curve!(BigDataStore[:ALL_CURVES], id; name = s)
+        update_curve!(BigDataStore; name = s)
         #also update the menu entry
         opts = menu_curves.options[]
         # @info "opts", opts
@@ -415,7 +415,7 @@ function main(;
 
     on(BigDataStore[:current_color]) do c
         
-        update_curve!(BigDataStore[:ALL_CURVES], BigDataStore[:edited_curve_id][]; color= c)
+        update_curve!(BigDataStore; color= c)
     end
 
     for (i, tb) in enumerate(tbscale)
@@ -456,7 +456,7 @@ function main(;
             
             BigDataStore[:edited_curve_id][] = 1
 
-            BigDataStore[:ALL_CURVES_GL][1] = (;name = "Curve 01", 
+            BigDataStore[:ALL_CURVES][1] = (;name = "Curve 01", 
                                             points = BigDataStore[:current_curve][].points,
                                             color = BigDataStore[:current_color][],
                                             is_smooth = BigDataStore[:current_curve][].is_smooth)
@@ -574,8 +574,7 @@ function main(;
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index = -1
-            update_curve!(BigDataStore[:ALL_CURVES], 
-                          BigDataStore[:edited_curve_id][]; 
+            update_curve!(BigDataStore; 
                           points = BigDataStore[:current_curve][].points,
                           is_smooth = BigDataStore[:current_curve][].is_smooth)
         end
@@ -699,41 +698,16 @@ function find_closest_point_to_position(pts, pos;
     return index
 end
 
-function get_initial_curve_pts(PTS)
-    X1, X2, Y1, Y2 = PTS
-    R1 = Point2f(X1[1], Y1[2])
-    R2 = Point2d(X2[1], Y2[2])
-    C1 = 0.8 * R1 + 0.2 * R2
-    C2 = 0.6 * R1 + 0.4 * R2
-    C3 = 0.4 * R1 + 0.6 * R2
-    C4 = 0.2 * R1 + 0.8 * R2
-
-    return [C1, C2, C3, C4]
-
-end
-
-function reset_marker_positions!(imsize, markers)
-    
-
-    sz = imsize
-    X1 = Point2f(0.1 * sz[1], 0.1 * sz[2])
-    X2 = Point2f(0.9 * sz[1], 0.1 * sz[2])
-    Y1 = Point2f(0.5 * sz[1], 0.1 * sz[2])
-    Y2 = Point2f(0.5 * sz[1], 0.9 * sz[2])
-    markers[] = [X1, X2, Y1, Y2]
-    
-    return nothing
-
-end
 
 
-function update_curve!(CRV, id; name = nothing,
+
+function update_curve!(D::Dict{Symbol, Any}; name = nothing,
                         color = nothing,
                         points = nothing,
                         is_smooth = nothing)
 
-    @assert 0 < id <= length(CRV)
-    nt = CRV[id]
+    nt = D[:ALL_CURVES][D[:edited_curve_id][]]
+
     name = isnothing(name) ? nt.name : name
     color = isnothing(color) ? nt.color : color
     points = isnothing(points) ? nt.points : points
@@ -744,7 +718,8 @@ function update_curve!(CRV, id; name = nothing,
     @assert typeof(points) == typeof(nt.points)
     @assert eltype(is_smooth) == eltype(is_smooth)
     @assert length(is_smooth) == div(length(points)-1,3)+1 
-    CRV[id] = (;name, color, points, is_smooth)
+
+    D[:ALL_CURVES][D[:edited_curve_id][]] = (;name, color, points, is_smooth)
 
 end
 
@@ -871,4 +846,53 @@ function transform(coords::Vector{T}, source::Tuple{T1, T1}, target::Tuple{T2, T
     trn = x1
     return @. exp((coords + TRN) * s + trn)
 
+end
+
+function get_initial_curve_pts(PTS)
+    X1, X2, Y1, Y2 = PTS
+    R1 = Point2f(X1[1], Y1[2])
+    R2 = Point2d(X2[1], Y2[2])
+    C1 = 0.8 * R1 + 0.2 * R2
+    C2 = 0.6 * R1 + 0.4 * R2
+    C3 = 0.4 * R1 + 0.6 * R2
+    C4 = 0.2 * R1 + 0.8 * R2
+
+    return [C1, C2, C3, C4]
+
+end
+
+function reset_marker_positions!(imsize, markers)
+    
+
+    sz = imsize
+    X1 = Point2f(0.1 * sz[1], 0.1 * sz[2])
+    X2 = Point2f(0.9 * sz[1], 0.1 * sz[2])
+    Y1 = Point2f(0.5 * sz[1], 0.1 * sz[2])
+    Y2 = Point2f(0.5 * sz[1], 0.9 * sz[2])
+    markers[] = [X1, X2, Y1, Y2]
+    
+    return nothing
+
+end
+
+function initial_curve(D::Dict{Symbol, Any}; reset = false)
+    
+    points = get_initial_curve_pts(D[:scale_rect][])
+    CB = CubicBezierCurve(points)
+    is_sm = CB.is_smooth
+    color = D[:current_color]
+    ntinit = (;name= "Curve 01", color, points, is_smooth = is_sm)
+    if reset
+        D[:current_curve] = CB
+        D[:current_color] = color
+        D[:edited_curve_id] = 1
+        
+        allc = D[:ALL_CURVES]
+        length(allc)>2 && deleteat!(allc, 2:length(allc))
+        allc[1] = ntinit
+
+        rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+
+    end
+    return ntinit
 end
