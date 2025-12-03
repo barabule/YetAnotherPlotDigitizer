@@ -59,4 +59,9 @@ Drop an image onto the window to load and display it. This will reset most setti
 
 ## Export
 
-After you're done, export the curves with the 'Export' button. You can set how many points are exported and the delimiter (for now). All curves will be exported as delimited text files with separate names in the same folder as the image file.
+* After you're done, export the curves with the 'Export' button.
+* You can set how many points are exported and the delimiter (for now).
+* All curves will be exported as delimited text files with separate names in the same folder as the image file.
+* By default all curves are sampled uniformly in arclength. Which produces (almost) same length segments and looks in general better.
+* There's a checkbox for exporting the curves sampled uniformly in x. This produces points that are uniform in X. More vertical lines will have fewer samples than horizontal portions.
+* Check this if you want monotonic X coordinates.
