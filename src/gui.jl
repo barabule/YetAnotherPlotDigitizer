@@ -79,6 +79,7 @@ function main(;
                     :curve_controls => nothing, #stuff that needs to change to reflect the current curve
                     #export
                     :num_export => Observable(100), #how many points per curve to export
+                    :export_horizontal => nothing, #export curves sampled horizontally
                     :export_folder => nothing, 
                     #curve data
                     :edited_curve_id => Observable(1), #id of the current curve
@@ -321,8 +322,12 @@ function main(;
 
     tb_export_num = Textbox(fig, placeholder = "100", validator = Int)
 
+
+    cb_export_horizontal = Checkbox(fig)
+    BigDataStore[:export_horizontal] = cb_export_horizontal.checked
+
     BOTTOMBAR[1,1] = vgrid!(
-                    hgrid!(Label(fig, "Points to export: "), tb_export_num),
+                    hgrid!(Label(fig, "Points to export: "), tb_export_num, Label(fig, "Sample in X"), cb_export_horizontal),
                     hgrid!(btn_export, menu_export),
                             )           
 
@@ -506,6 +511,7 @@ function main(;
                     N, 
                     format, 
                     export_folder = BigDataStore[:export_folder],
+                    sample_horizontal = BigDataStore[:export_horizontal][],
                     )
         status_text[] = "Exported files!"
     end
@@ -782,7 +788,8 @@ end
 function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type; 
                     N = 100, 
                     format = :csv, 
-                    export_folder = nothing::Union{Nothing, String})
+                    export_folder = nothing::Union{Nothing, String},
+                    sample_horizontal = false)
 
 
     if format==:csv
@@ -801,7 +808,12 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
         else
             fn = joinpath(export_folder, crv.name * ext)
         end
-        data = sample_cubic_bezier_curve(crv.points; samples = N, lut_samples = 200)
+        if sample_horizontal
+            data = sample_cubic_bezier_curve_horizontally(crv.points; samples = N, lut_samples = 200)
+        else
+            data = sample_cubic_bezier_curve(crv.points; samples = N, lut_samples = 200)
+        end
+        
         #needs to be transformed
         X1, X2, Y1, Y2 = scale_rect
         tdata = transform_pts(data, (X1[1], X2[1], Y1[2], Y2[2]), plot_range, scale_type)

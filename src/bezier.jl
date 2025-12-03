@@ -121,6 +121,29 @@ function create_arc_length_lut(control_points::Vector{PT}; samples_per_segment=5
     return lut, cumulative_length
 end
 
+function create_horizontal_lut(control_points::Vector{PT}; samples_per_segment= 10) where PT
+    
+
+    nseg = div(length(control_points)-1, 3) #4 -> 1, 7 -> 2
+    ti = LinRange(0, 1, samples_per_segment)
+    T = eltype(first(control_points))
+    lut = (;index = repeat(collect(1:nseg), inner = samples_per_segment),
+            tval = repeat(ti, nseg),
+            xval = Vector{T}())
+    
+    
+    xvalbuf = zeros(eltype(first(control_points)), samples_per_segment)
+    for i in 1:nseg
+        
+        idx_start = 3 * (i-1) + 1
+        P0, P1, P2, P3 = control_points[idx_start], control_points[idx_start+1], control_points[idx_start+2], control_points[idx_start+3]
+        for j in 1:samples_per_segment
+            xvalbuf[j] = cubic_bezier_point(ti[j], P0, P1, P2, P3)[1]
+        end
+        push!(lut.xval, xvalbuf...)
+    end
+    return lut
+end
 
 function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100, lut_samples = 20) where PT
     @assert (length(control_points)-1) % 3 == 0 "Must have 3k+1 control points, k = segments"
@@ -152,6 +175,39 @@ function sample_cubic_bezier_curve(control_points::Vector{PT}; samples = 100, lu
     end
     return PTS
 end
+
+
+function sample_cubic_bezier_curve_horizontally(control_points::Vector{PT}; samples = 100, lut_samples =20) where PT
+
+    LUT =  create_horizontal_lut(control_points; samples_per_segment = lut_samples)
+    xfirst = first(control_points)[1]
+    xlast = last(control_points)[1]
+
+    xrange = LinRange(xfirst, xlast, samples) 
+
+    PTS = [first(control_points)]
+    @assert samples >= 2 "At least 2 samples are needed!"
+    
+    for i in 2:samples-1
+        xi = xrange[i]
+        # id_hi = findfirst(x -> x > xi, view(LUT.xval, prev_idx:last_idx)) + prev_idx - 1
+        id_hi = findfirst(x -> x > xi, LUT.xval)
+        id_lo = id_hi-1
+        # @info "xi", xi, "i", i, "id_hi", id_hi
+        # @info "LUT", LUT.xval
+        
+        xhi, xlo = LUT.xval[id_hi], LUT.xval[id_lo] #bracketing interval
+        u = (xi - xlo)/ (xhi - xlo) 
+        t = LUT.tval[id_lo] * (1-u) + LUT.tval[id_hi] * u
+        seg = LUT.index[id_hi] 
+        id_pt = 3 * (seg-1)+ 1
+        P0, P1, P2, P3 = control_points[id_pt], control_points[id_pt+1], control_points[id_pt+2], control_points[id_pt+3]
+        push!(PTS, cubic_bezier_point(t, P0, P1, P2, P3))
+    end
+    push!(PTS, last(control_points))
+
+end
+
 
 function add_bezier_segment!(vertices, mousepos)
     #identify where to put new point
