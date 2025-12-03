@@ -282,7 +282,10 @@ function closest_point_to_line_segment(L1, L2, P) #closest pt
     else
         t = (L2[2] - Q[2] / (L21[2]))
     end
-    return (Q, norm(P-Q), t)
+    # return (Q, norm(P-Q), t)
+    return (;projection = Q,
+            distance = norm(P-Q),
+            parameter = t)
 end
 
 

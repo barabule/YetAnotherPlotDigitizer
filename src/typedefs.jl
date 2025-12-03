@@ -263,6 +263,12 @@ function toggle_smoothness(C::CubicBezierCurve, cp_id)
     return nothing
 end
 
+"""
+    find_closest_point_to_position(C::CubicBezierCurve, position; thresh = 20, area= :square)
+
+Returns the index of the closest point of CubicBezierCurve C to position.
+thresh is the detectability threshold, points have to be closer than that to be detected. 
+"""
 function find_closest_point_to_position(C::CubicBezierCurve, position; thresh = 20, area= :square)
     d_closest = Inf
     i_closest = -1
@@ -281,6 +287,11 @@ function find_closest_point_to_position(C::CubicBezierCurve, position; thresh = 
 end
 
 
+"""
+    find_closest_segment(C::CubicBezierCurve, position)
+
+Return the index of the closest segment of curve C to position.
+"""
 function find_closest_segment(C::CubicBezierCurve, position)
     cp_id = find_closest_control_point_to_position(C, position)
     #check which side of the cp to return
@@ -301,4 +312,45 @@ function find_closest_segment(C::CubicBezierCurve, position)
     d_aft = norm(CP_after - position)
 
     return d_bef<d_aft ? seg_before : seg_after
+end
+
+
+"""
+    closest_projected_segment(C::CubicBezierCurve, position)
+
+Finds the closest segment of C to position by projecting position on the linesegments made by consecutive controlpoints.
+The segment with the smallest projected distance wins, with preference to segments where the projection is inside the segment.
+"""
+function find_closest_projected_segment(C::CubicBezierCurve, position)
+
+    nseg = number_of_segments(C)
+    dmin = Inf
+    iseg = -1
+    dmaybe = Inf # in case the projected point lands outside the line segment
+    imaybe = -1 #
+    for i in 1:nseg
+        seg_start = 3 * (i-1)+1 #1, 4, 7
+        seg_end = seg_start + 3 #4, 7, 10
+
+        C_start = C.points[seg_start]
+        C_end = C.points[seg_end]
+
+        line_proj = closest_point_to_line_segment(C_start, C_end, position)
+        dproj = line_proj.distance
+        dproj > dmin && continue
+        
+        tproj = line_proj.parameter
+        if 0 <= tproj <= 1
+            dmin = dproj
+            iseg = i
+            continue
+        end
+        # tproj is outside the Cstart - Cend line
+        if dproj < dmaybe #we get next best thing
+            dmaybe = dproj
+            imaybe = i 
+        end
+    end
+    iseg = iseg == -1 ? imaybe : iseg #no projection within segment so pick the closest alternative
+    return iseg
 end

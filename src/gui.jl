@@ -591,7 +591,8 @@ function main(;
                 # Check if we have a valid mouse position in data coordinates
                 data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
                 current_points = BigDataStore[:current_curve][]
-                segid = find_closest_segment(current_points, data_pos)
+                # segid = find_closest_segment(current_points, data_pos)
+                segid = find_closest_projected_segment(current_points, data_pos)
                 add_segment!(current_points, segid)
                 BigDataStore[:current_curve][] = current_points
                 return Consume(true)
