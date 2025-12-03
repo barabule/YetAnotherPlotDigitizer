@@ -439,6 +439,9 @@ function main(;
             
             st = val ? :log : :linear
             BigDataStore[:scale_type][][i] = st
+            axis = cb==cblogx ? "X" : "Y"
+            stext = st==:log ? "logarithmic" : "linear"
+            status_text[] = "Changed $axis scaling to $stext"
         end
     end
 
