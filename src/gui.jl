@@ -126,9 +126,11 @@ function main(;
     BOTTOMBAR = GridLayout(fig[2,1], tellwidth =false, height = bottombar_height)#other stuff?
 
     
-    label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one, 's' to toggle sharp.",
+    label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one, 's' to toggle sharp." *
+                            "\nZoom with scrollwheel, pan with RMB, reset zoom with CTRL+LMB",
                     fontsize= 16,
-                    color = :grey10,
+                    font = :italic,
+                    color = :grey40,
                     halign =:center,
                     valign = :top,
                     padding = (10, 0, 0, 10),
@@ -212,14 +214,18 @@ function main(;
     scaling_pts = (scatter!(ax_img, BigDataStore[:scale_rect], color = [:red, :red, :green, :green], 
                                 marker = RingBarMarker,
                                 markersize = SCALE_MARKER_SIZE,
-                                rotation = [0, 0, pi/2, pi/2]),
+                                rotation = [0, 0, pi/2, pi/2], 
+                                strokecolor = :black,
+                                strokewidth =1,),
 
     text!(ax_img, BigDataStore[:scale_rect]; text =["X1", "X2", "Y1", "Y2"],
                         color = [:red, :red, :green, :green],
                         # color = :black,
                         fontsize = SCALE_MARKER_SIZE,
                         offset = (SCALE_MARKER_SIZE, SCALE_MARKER_SIZE)
-                        )
+                        ),
+
+                        
     )
     
     
@@ -240,7 +246,7 @@ function main(;
     end
     edited_curve_fine_plot = lines!(ax_img, bezier_curve, 
                                     color = BigDataStore[:current_color], 
-                                    linewidth = 0.3 * MARKER_SIZE,
+                                    linewidth = 0.2 * MARKER_SIZE,
                                     alpha = 0.6,
                                     linestyle = :solid)
                                     #
@@ -390,7 +396,7 @@ function main(;
         
         
         BigDataStore[:edited_curve_id][] = s
-        # cdata = BigDataStore[:ALL_CURVES][s]
+        cdata = BigDataStore[:ALL_CURVES][s]
         
         update_current_curve_controls!(BigDataStore)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
@@ -408,7 +414,7 @@ function main(;
         # @info "opts", opts
         opts[id] = (s, opts[id][2])
         menu_curves.options[] = opts
-
+        menu_curves.i_selected[] = id
         label_curve_name.text[] = "Current curve: $s"
         status_text[] = "Changed curve from $old_name to $s"
     end
@@ -459,7 +465,7 @@ function main(;
             deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
         end
         reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
-        @info "reset"
+        # @info "reset"
         ntinit = initial_curve(BigDataStore; reset = true)
             
             
@@ -734,11 +740,11 @@ end
 function rebuild_menu_options!(menu, ALL_CURVES)
     
     opts = Vector{Tuple{String, Int}}()
-    @info "before", opts
+    # @info "before", opts
     for (i, crv) in enumerate(ALL_CURVES)
         push!(opts, (crv.name, i))
     end
-    @info "options done", opts
+    # @info "options done", opts
     menu.options[] = opts
 end
 
@@ -898,7 +904,7 @@ function initial_curve(D::Dict{Symbol, Any}; reset = false)
         menu_curves = D[:curves_menu]
         rebuild_menu_options!(menu_curves, D[:ALL_CURVES])
         menu_curves.i_selected[] = 1
-        @info "switch"
+        # @info "switch"
         switch_other_curves_plot!(D[:ax], D[:ALL_CURVES], 1, D[:other_curve_plots])
         update_current_curve_controls!(D)
     end
