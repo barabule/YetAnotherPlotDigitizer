@@ -5,7 +5,8 @@ function main(;
         sidebar_width = 200,
         bottombar_height = 100,
         PICK_THRESHOLD = 20,
-        MARKER_SIZE = 20,
+        MARKER_SIZE = 25,
+        SCALE_MARKER_SIZE = 12,
         )
 
     #######GLOBALS###########################
@@ -29,8 +30,8 @@ function main(;
     HollowCircleMarker = BezierPath([
         MoveTo(Point(0.5, 0)),
         EllipticalArc(Point(0, 0), 0.5, 0.5, 0, 0, 2pi),
-        MoveTo(Point(0.4, 0.0)),
-        EllipticalArc(Point(0, 0), 0.4, 0.4, 0, 0, -2pi),
+        MoveTo(Point(0.35, 0.0)),
+        EllipticalArc(Point(0, 0), 0.35, 0.35, 0, 0, -2pi),
         ClosePath(),
     ])
 
@@ -41,11 +42,11 @@ function main(;
         LineTo(-0.5, 0),
         LineTo(0, -0.5),
         LineTo(0.5, 0),
-        MoveTo(0.4, 0),
-        LineTo(0, -0.4),
-        LineTo(-0.4, 0),
-        LineTo(0, 0.4),
-        LineTo(0.4, 0),
+        MoveTo(0.35, 0),
+        LineTo(0, -0.35),
+        LineTo(-0.35, 0),
+        LineTo(0, 0.35),
+        LineTo(0.35, 0),
         ClosePath()
     ])
 
@@ -66,26 +67,16 @@ function main(;
                     :scale_type => Observable([:linear, :linear]),
                     :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
                     #plotting
-                    :style_main_vertex_smooth =>(;markercolor = :red, 
-                                                marker = HollowCircleMarker, 
-                                                markersize = MARKER_SIZE),
-
-                    :style_main_vertex_sharp  => (;markercolor = :red, 
-                                                marker = HollowDiamondMarker, 
-                                                markersize = MARKER_SIZE),
-
-                    :style_handles => (markercolor = :grey, 
-                                    marker = :circle, 
-                                    markersize = 0.7 * MARKER_SIZE,
-                                    linestyle = :dash,
-                                    color = :grey,
-                                    linewidth = 0.1 * MARKER_SIZE),
-
-                    :style_edited_curve => (;linestyle = :solid, 
-                                    linewidth = 0.2 * MARKER_SIZE),
-
-                    :style_stored_curves => (;linestyle = :solid, 
-                                    linewidth = 0.1 * MARKER_SIZE),
+                    :marker_handles => HollowCircleMarker,
+                    :marker_smooth => HollowCircleMarker,
+                    :marker_sharp => HollowDiamondMarker,
+                    :color_handles => :grey,
+                    :color_smooth => :red,
+                    :color_sharp => :red,
+                    :size_control_points => MARKER_SIZE,
+                    :size_handles => 0.8 * MARKER_SIZE,
+                    :ax => nothing, #holds the plot axis
+                    :curve_controls => nothing, #stuff that needs to change to reflect the current curve
                     #export
                     :num_export => Observable(100), #how many points per curve to export
                     :export_folder => nothing, 
@@ -119,8 +110,7 @@ function main(;
     
     ax_img = Axis(fig[1,1], aspect = DataAspect(), tellheight=  false, tellwidth = false)
     deregister_interaction!(ax_img, :rectanglezoom) #just gets in the way when dragging
-    # ax_img.xautolimitmargin = (0, 0)
-    # ax_img.yautolimitmargin = (0, 0)
+    BigDataStore[:ax] = ax_img
     
     SIDEBAR = GridLayout(fig[1,2], width = sidebar_width, tellheight = false)
 
@@ -177,6 +167,8 @@ function main(;
                         hgrid!(Label(fig, "Curve: "), menu_curves),
                                 )
 
+
+    push!(BigDataStore, :curves_menu => menu_curves)
     #################CURVE##############################################################################################
 
     tb_curve_name = Textbox(fig, placeholder = "Curve 01", width = 0.7 * sidebar_width)
@@ -219,14 +211,14 @@ function main(;
     img_plot = image!(ax_img, BigDataStore[:ref_img])
     scaling_pts = (scatter!(ax_img, BigDataStore[:scale_rect], color = [:red, :red, :green, :green], 
                                 marker = RingBarMarker,
-                                markersize = PICK_THRESHOLD/2,
+                                markersize = SCALE_MARKER_SIZE,
                                 rotation = [0, 0, pi/2, pi/2]),
 
     text!(ax_img, BigDataStore[:scale_rect]; text =["X1", "X2", "Y1", "Y2"],
                         color = [:red, :red, :green, :green],
                         # color = :black,
-                        fontsize = PICK_THRESHOLD/2,
-                        offset = (PICK_THRESHOLD/2, PICK_THRESHOLD/2)
+                        fontsize = SCALE_MARKER_SIZE,
+                        offset = (SCALE_MARKER_SIZE, SCALE_MARKER_SIZE)
                         )
     )
     
@@ -279,24 +271,33 @@ function main(;
     end
 
     scatter!(ax_img, HandlePoints,
-                marker = :circle,
-                markersize = 0.8*MARKER_SIZE,
-                color = :grey)
+                marker = BigDataStore[:marker_handles],
+                markersize = BigDataStore[:size_handles],
+                color = BigDataStore[:color_handles],
+                strokecolor = :black,
+                strokewidth = 1,
+                )
 
     scatter!(ax_img, SmoothPoints, 
-                marker = HollowCircleMarker,
-                markersize = MARKER_SIZE,
-                color = :red)
+                marker = BigDataStore[:marker_smooth],
+                markersize = BigDataStore[:size_control_points],
+                color = BigDataStore[:color_smooth],
+                strokecolor = :black,
+                strokewidth = 1,
+                )
 
     scatter!(ax_img, SharpPoints,
-                marker = HollowDiamondMarker,
-                markersize = MARKER_SIZE,
-                color = :red)
+                marker = BigDataStore[:marker_sharp],
+                markersize = BigDataStore[:size_control_points],
+                color = BigDataStore[:color_sharp],
+                strokecolor = :black,
+                strokewidth = 1,
+                )
 
     
 
     curve_controls = [tb_curve_name, BigDataStore[:current_color], BigDataStore[:current_curve], label_curve_name]
-
+    BigDataStore[:curve_controls] = curve_controls
     #############BOTTOM#################################################################################################
 
     btn_export = Button(fig, label="Export", width = 50)
@@ -359,7 +360,7 @@ function main(;
         BigDataStore[:edited_curve_id][] = inext
         rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
         
-        update_current_curve_controls!(curve_controls, nt)
+        update_current_curve_controls!(BigDataStore, nt)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
         status_text[] = "Added new curve $new_name"
         menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
@@ -374,8 +375,7 @@ function main(;
             deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
             rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
             BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
-            update_current_curve_controls!(curve_controls, 
-                    BigDataStore[:ALL_CURVES][BigDataStore[:edited_curve_id][]])#we should also update the color etc...
+            update_current_curve_controls!(BigDataStore)#we should also update the color etc...
             switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
                                 BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
             status_text[] = "Removed curve $old_name"
@@ -390,9 +390,9 @@ function main(;
         
         
         BigDataStore[:edited_curve_id][] = s
-        cdata = BigDataStore[:ALL_CURVES][s]
+        # cdata = BigDataStore[:ALL_CURVES][s]
         
-        update_current_curve_controls!(curve_controls, cdata)
+        update_current_curve_controls!(BigDataStore)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
         status_text[] = "Editing curve $(cdata.name)"
     end
@@ -436,6 +436,7 @@ function main(;
         end
     end
 
+    ##########################     RESET    ############################################################################
     ## TODO better reset
     on(events(fig).dropped_files) do files
         isempty(files) && return nothing
@@ -445,39 +446,29 @@ function main(;
         println(f1)
         try
             BigDataStore[:ref_img][] = rotr90(load(f1))
-            reset_limits!(ax_img) 
-            #reset most state 
-            if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
-                deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
-            end
-            reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
             
-            BigDataStore[:current_curve][] = get_initial_curve_pts(BigDataStore[:scale_rect][])
-            
-            BigDataStore[:edited_curve_id][] = 1
-
-            BigDataStore[:ALL_CURVES][1] = (;name = "Curve 01", 
-                                            points = BigDataStore[:current_curve][].points,
-                                            color = BigDataStore[:current_color][],
-                                            is_smooth = BigDataStore[:current_curve][].is_smooth)
-
-            rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
-            # BigDataStore[:ALL_CURVES][1] =ntinit #put the initial simple curve into the 1st slot
-            # reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
-            # BigDataStore[:current_curve][] = get_initial_curve_pts(BigDataStore[:scale_rect][])
-            # menu_curves.options[] = [("Curve 01", 1)]
-            # tb_curve_name.placeholder = "Curve 01"
-            
-            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 1, BigDataStore[:other_curve_plots])   
-             
-            status_text[] = "New image imported!"   
         catch e
             # @info "Probably not an image?"
             status_text = "Cannot open this file. Probably not an image?"
+            return nothing
         end
+
+        reset_limits!(ax_img) 
+        #reset most state 
+        if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
+            deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
+        end
+        reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
+        @info "reset"
+        ntinit = initial_curve(BigDataStore; reset = true)
+            
+            
+        status_text[] = "New image imported!"   
         
+        # @info BigDataStore        
     end
 
+    ####################################################################################################################
 
     on(tb_export_num.stored_string) do s
         n = 10
@@ -712,18 +703,26 @@ function update_curve!(D::Dict{Symbol, Any}; name = nothing,
     color = isnothing(color) ? nt.color : color
     points = isnothing(points) ? nt.points : points
     is_smooth = isnothing(is_smooth) ? nt.is_smooth : is_smooth
-
+    # @info "n", name, "c", color, "pts", length(points), "sm", is_smooth 
     @assert typeof(name) == typeof(nt.name)
+    
+    # @info "col type", typeof(color), "col t2", typeof(nt.color)
+    # @info "col check", typeof(color) == typeof(nt.color)
+    
     @assert typeof(color) == typeof(nt.color)
+    # @info "no assertion errors"
     @assert typeof(points) == typeof(nt.points)
     @assert eltype(is_smooth) == eltype(is_smooth)
     @assert length(is_smooth) == div(length(points)-1,3)+1 
-
+    
     D[:ALL_CURVES][D[:edited_curve_id][]] = (;name, color, points, is_smooth)
 
 end
 
-function update_current_curve_controls!(curve_controls, cdata)
+function update_current_curve_controls!(D::Dict{Symbol, Any}, cdata=nothing)
+    curve_controls = D[:curve_controls] 
+    cdata = isnothing(cdata) ? D[:ALL_CURVES][D[:edited_curve_id][]] : cdata
+
     TB, current_color, current_curve, crv_label = curve_controls
     # TB.placeholder[] = cdata.name #this doesn't do anything
     current_color[] = cdata.color 
@@ -735,9 +734,11 @@ end
 function rebuild_menu_options!(menu, ALL_CURVES)
     
     opts = Vector{Tuple{String, Int}}()
+    @info "before", opts
     for (i, crv) in enumerate(ALL_CURVES)
         push!(opts, (crv.name, i))
     end
+    @info "options done", opts
     menu.options[] = opts
 end
 
@@ -880,19 +881,26 @@ function initial_curve(D::Dict{Symbol, Any}; reset = false)
     points = get_initial_curve_pts(D[:scale_rect][])
     CB = CubicBezierCurve(points)
     is_sm = CB.is_smooth
-    color = D[:current_color]
+    color = D[:current_color][]
     ntinit = (;name= "Curve 01", color, points, is_smooth = is_sm)
+    # @info "reset start"
     if reset
-        D[:current_curve] = CB
-        D[:current_color] = color
-        D[:edited_curve_id] = 1
+        D[:current_curve][] = CB
         
+        D[:edited_curve_id][] = 1
         allc = D[:ALL_CURVES]
         length(allc)>2 && deleteat!(allc, 2:length(allc))
-        allc[1] = ntinit
-
-        rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
-
+        D[:current_color][] = color
+        # @info "edited", D[:edited_curve_id][]
+        # @info "CC", D[:current_curve]
+        update_curve!(D; ntinit...)
+        # @info "rebuild"
+        menu_curves = D[:curves_menu]
+        rebuild_menu_options!(menu_curves, D[:ALL_CURVES])
+        menu_curves.i_selected[] = 1
+        @info "switch"
+        switch_other_curves_plot!(D[:ax], D[:ALL_CURVES], 1, D[:other_curve_plots])
+        update_current_curve_controls!(D)
     end
     return ntinit
 end
