@@ -36,7 +36,7 @@ Drop an image onto the window to load and display it. This will reset most setti
 * Set the values for the Xs and Ys in their corresponding textbox. Press Enter for the changes to 'stick', look for the status label on top to reflect the change.
 * You can change this whenever you need before exporting, so don't worry about it too much.
 * For logarithmic scales keep in mind to have strictly positive (non zero) values for both scale markers (i.e. X1 & X2 or Y1 & Y2). If this is not the case, you won't be able to export anything.
-
+![Setting the range markers](assets/setting_ranges_640.gif) "Range markers"
 ## Curve Editing
 
 * By default a 1 segment cubic Bezier curve is created. The curve is modified by dragging its control cage.
@@ -46,7 +46,7 @@ Drop an image onto the window to load and display it. This will reset most setti
 * 'Sharp' means that the associated handle points can be moved independently from each other.
 * For smooth control points the 2 handle points are always collinear with the main point. This is very similar to how a vector editor works.
 * You can't delete the last 2 remaining control points.
-
+![Curve editing](assets/curve_editing.gif) "Curve editing"
 ## Other Controls
 
 * On the right you can find a few controls with settings for the currently edited curve.
