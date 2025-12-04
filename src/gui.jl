@@ -261,19 +261,19 @@ function main(;
     ### WORKAROUND
 
     SmoothPoints = lift(BigDataStore[:current_curve]) do cc
-        idx_main_cp = filter(i -> is_main_vertex(i), eachindex(cc.points))
+        idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
         idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
         cc.points[idx_main_cp[idx_smooth]]
     end
 
     SharpPoints = lift(BigDataStore[:current_curve]) do cc
-        idx_main_cp = filter(i -> is_main_vertex(i), eachindex(cc.points))
+        idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
         idx_sharp = filter(i -> !cc.is_smooth[i], eachindex(cc.is_smooth))
         cc.points[idx_main_cp[idx_sharp]]
     end
 
     HandlePoints = lift(BigDataStore[:current_curve]) do cc
-        idx_handle_pts = filter(i -> !is_main_vertex(i), eachindex(cc.points))
+        idx_handle_pts = filter(i -> !is_control_point(i), eachindex(cc.points))
         cc.points[idx_handle_pts]
     end
 

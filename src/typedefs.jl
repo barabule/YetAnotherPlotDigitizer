@@ -17,50 +17,6 @@ function ScaleType(s::Symbol)
 end
 
 
-# abstract type ControlPointType end
-# abstract type MainControlPoint <: ControlPointType end
-
-# struct SharpControlPoint<:MainControlPoint
-#     # data::Point2f 
-# end
-
-# struct SmoothControlPoint<:MainControlPoint
-#     # data::Point2f
-# end
-
-# struct HandlePoint<:ControlPointType #tangent handle pt
-#     # data::Point2f #
-# end
-
-# import Base: +, -, *, length, getindex, eltype
-
-# Base.length(::ControlPointType) = 2
-# Base.getindex(s::ControlPointType, i) = s[i]
-# Base.eltype(::ControlPointType) = Float32
-
-# function Base.:+(a::M, b::M) where M<:ControlPointType
-#     M(a.data + b.data)
-# end
-
-# function Base.:-(a::M, b::M) where M<:ControlPointType
-#     M(a.data - b.data)
-# end
-
-# function Base.:+(a::M1, b::M2) where {M1<:ControlPointType, M2<:ControlPointType}
-#     a.data + b.data
-# end
-
-# function Base.:-(a::M1, b::M2) where {M1<:ControlPointType, M2<:ControlPointType}
-#     a.data - b.data
-# end
-
-# #always returns a Point2f when operating on ControlPoints
-# Base.:*(s::Real, p::M) where {M<:ControlPointType} = s * p.data
-# Base.:/(p::M, s::Real) where {M<:ControlPointType} = p.data / s
-
-# Base.:+(a::M, b::Point2f) where {M<:ControlPointType} = a.data + b
-
-
 struct CubicBezierCurve{PT<:Point2{<:Real}} 
     points::Vector{PT} #ordering: CP handle handle CP handle handle etc
     is_smooth::Vector{Bool}
@@ -94,7 +50,7 @@ function number_of_segments(C::CubicBezierCurve)
     return div(N-1, 3)
 end
 
-#TODO too many points generated
+
 function add_segment!(C::CubicBezierCurve,  
                         segment_id::Integer)
 
@@ -134,9 +90,11 @@ function remove_control_point!(C::CubicBezierCurve, cpid::Integer)
     return nothing
 end
 
+
 function is_control_point(id::Integer)
     return mod(id,3)==1
 end
+
 
 function get_attached_cp_and_handle(C::CubicBezierCurve, id::Integer)
     if is_control_point(id-1)
@@ -165,6 +123,7 @@ function move!(C::CubicBezierCurve, id::Integer, position)
     
     return nothing
 end
+
 
 function move_CP!(C::CubicBezierCurve, id, position) #move CP and attached handles
     
@@ -209,7 +168,6 @@ function move_handle!(C::CubicBezierCurve, ids, position)
 end
 
 
-#eval wrappers
 function piecewise_cubic_bezier(C::CubicBezierCurve; 
                                 N_segments = 50,
                                 )
