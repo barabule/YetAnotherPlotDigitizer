@@ -628,7 +628,7 @@ function main(;
     
     
 
-    return fig
+    return wait(display(fig))
 end
 
 
