@@ -1,20 +1,27 @@
 # YetAnotherPlotDigitizer
 
 ## Overview
-Yep, it's yet another plot digitizer, but with bezier curves instead of just a list of coordinates.
-The purpose of this tool does is to take points (curves) in image space (pixels) and transform them into another more useful space (plot space).
+* Yep, it's yet another plot digitizer, but with bezier curves instead of just a list of coordinates.
+* The purpose of this tool does is to take points (curves) in image space (pixels) and transform them into another more useful space (plot space).
+* The proposed workflow should be more usable and smoother than existing plot digitizers due to the better and easier control of the resulting curves and the dynamic zooming and paning afforded by Makie.
 
 ## Installation
-For this tool to work you need to have a working Julia installation. I recommend installing via [Juliaup](https://github.com/JuliaLang/juliaup).
-Navigate to a new (empty) folder and start Julia there.
-Go into package mode via ']'
-* Activate a new environment and add the package
+* For this tool to work you need to have a working Julia installation. I recommend installing via [Juliaup](https://github.com/JuliaLang/juliaup).
+* After Julia is installed, you need to download the package and instantiate it to an environment (preferably).
+* To do this, navigate to a new (empty) folder and start Julia there.
+* Go into package mode via ']'
+* Activate a new environment and add the package:
 ```
 activate . 
 add https://github.com/barabule/YetAnotherPlotDigitizer.git
 ```
+* You only need to do this ONCE.
+* Optionally, update the package, if it's already installed:
+```
+update YetAnotherPlotDigitizer
+```
 
-* Then, after it finishes installing, exit package more (Backspace) and use the package and call the _main_ function:
+* After it finishes installing, exit package mode (via Backspace key) and use the package and call the _main_ function:
 
 ```
 using YetAnotherPlotDigitizer
@@ -23,8 +30,25 @@ main()
 
 * This will start a GUI.
   
-# First steps
-Drop an image onto the window to load and display it. This will reset most setting. If you want to digitize more plots just drop a new image and go from there, no need to restart the application.
+## Optional
+* You can start the GUI by making 2 scripts and starting Julia with this script with the '-i' (interactive) option, like so:
+* First, make a .jl file ("script.jl" for example) in the folder, whith the following content:
+* ```
+  import Pkg; Pkg.activate(pwd());
+  using YetAnotherPlotDigitizer
+  main()
+  ```
+  
+* Make a shell script (or bat in Windows) calling Julia
+* ```
+    #!/bin/bash
+    julia -i script.jl
+    ```
+* Call this script (or double click execute in terminal) and the GUI should open.
+## First steps
+* Drag and drop an image file onto the window to load and display it. If the image is recognized the background will change to the new image.
+* This will reset most setting.
+* If you want to digitize more plots just drop a new image and go from there, no need to restart the application.
 
 ## Scale Markers
 * There are 4 draggable scale markers positioned on the image (red for X1 & X2 direction, green for Y1 & Y2).
