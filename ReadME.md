@@ -60,6 +60,8 @@ main()
 * Set the values for the Xs and Ys in their corresponding textbox. Press Enter for the changes to 'stick', look for the status label on top to reflect the change.
 * You can change this whenever you need before exporting, so don't worry about it too much.
 * For logarithmic scales keep in mind to have strictly positive (non zero) values for both scale markers (i.e. X1 & X2 or Y1 & Y2). If this is not the case, you won't be able to export anything.
+* There's also the option to check the freeze markers checkbox to prevent unwanted movement of the scale markers.
+  
 ![Setting the range markers](assets/setting_ranges_640.gif) "Range markers"
 ## Curve Editing
 
