@@ -66,6 +66,7 @@ function main(;
                     :scale_rect => Observable([PZ, PZ, PZ, PZ]), #scaling range markers
                     :scale_type => Observable([:linear, :linear]),
                     :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
+                    :freeze_scale => nothing, #observable to indicate if the scale markers can be moved
                     #plotting
                     :marker_handles => HollowCircleMarker,
                     :marker_smooth => HollowCircleMarker,
@@ -87,6 +88,7 @@ function main(;
                     :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
+
     ) #holds everything
     
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
@@ -143,13 +145,15 @@ function main(;
     
     #################### SCALE / GLOBAL ################################################################################
 
-
+    cb_freeze_scale = Checkbox(fig, checked =false)
+    BigDataStore[:freeze_scale] = cb_freeze_scale.checked
     tbscale = [Textbox(fig, width = sidebar_width/3, validator = Float64, 
                             placeholder = "$(BigDataStore[:plot_range][][i])") for i in 1:4]
     cblogx = Checkbox(fig, checked=false)
     cblogy = Checkbox(fig, checked=false)
     SCALE_GL[1,1] = Label(fig, "Scale")
     SCALE_GL[2,1] = vgrid!(
+                    hgrid!(Label(fig, "Freeze scale markers"), cb_freeze_scale),
                     hgrid!(Label(fig, "X1:"), tbscale[1]),
                     hgrid!(Label(fig, "X2:"), tbscale[2]),
                     hgrid!(Label(fig, "log"), cblogx),
@@ -158,7 +162,7 @@ function main(;
                     hgrid!(Label(fig, "log"), cblogy),
                                 )
 
-
+    
     #############ALL CURVES#############################################################################################
 
     menu_curves = Menu(fig, options = [("Curve 01", 1)],
@@ -556,11 +560,12 @@ function main(;
             new_data_pos = Makie.mouseposition(ax_img.scene)
             
             if target_observable === scaling_pts
-               
-                current_points = BigDataStore[:scale_rect][]
-                current_points[dragged_index[]] = new_data_pos
-                BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
-                return Consume(true)
+               if !BigDataStore[:freeze_scale][]
+                    current_points = BigDataStore[:scale_rect][]
+                    current_points[dragged_index[]] = new_data_pos
+                    BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
+                    return Consume(true)
+                end
             end
             if target_observable === ctrl_lines
                 current_points = BigDataStore[:current_curve][]
