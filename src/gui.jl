@@ -534,7 +534,7 @@ function main(;
             idx = find_closest_point_to_position(BigDataStore[:scale_rect][], mousepos; 
                                                 PICK_THRESHOLD, 
                                                 area= :square)
-            if idx !=-1
+            if idx !=-1 && !BigDataStore[:freeze_scale][] #ignore the scale markers if frozen
                  target_observable = scaling_pts
                  dragged_index = idx
                  return Consume(true)   
@@ -559,13 +559,11 @@ function main(;
             # Convert mouse position (in pixels) to data coordinates
             new_data_pos = Makie.mouseposition(ax_img.scene)
             
-            if target_observable === scaling_pts
-               if !BigDataStore[:freeze_scale][]
-                    current_points = BigDataStore[:scale_rect][]
-                    current_points[dragged_index[]] = new_data_pos
-                    BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
-                    return Consume(true)
-                end
+            if target_observable === scaling_pts && !BigDataStore[:freeze_scale][]
+                current_points = BigDataStore[:scale_rect][]
+                current_points[dragged_index[]] = new_data_pos
+                BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
+                return Consume(true)
             end
             if target_observable === ctrl_lines
                 current_points = BigDataStore[:current_curve][]
