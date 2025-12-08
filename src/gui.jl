@@ -57,11 +57,17 @@ function main(;
     
     is_colorgrid_visible = Observable(false)
     
+    init_img = try
+        rotr90(load("assets/example_raster_plot.jpg"))
+    catch
+        fill(RGB(0.1, 0.1, 0.1), 640, 480)
+    end
+
     BigDataStore = Dict{Symbol, Any}(
                     # general
                     :cmap => cmap,#color map for curves
                     #img
-                    :ref_img => Observable{Any}(fill(RGB(0.1, 0.1, 0.1), 640, 480)),
+                    :ref_img => Observable{Any}(init_img),
                     #scaling
                     :scale_rect => Observable([PZ, PZ, PZ, PZ]), #scaling range markers
                     :scale_type => Observable([:linear, :linear]),
@@ -130,7 +136,8 @@ function main(;
 
     
     label_help = Label(fig, "Press \"a\" to add a segment, \"d\" to delete one, 's' to toggle sharp." *
-                            "\nZoom with scrollwheel, pan with RMB, reset zoom with CTRL+LMB",
+                            "\nZoom with scrollwheel, pan with RMB, reset zoom with CTRL+LMB" *
+                            "\nDrag and drop an image file to load it.",
                     fontsize= 16,
                     font = :italic,
                     color = :grey40,
