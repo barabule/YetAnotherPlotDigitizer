@@ -1,7 +1,7 @@
 name = "YetAnotherPlotDigitizer"
 uuid = "e2b36d35-08f8-4606-b6fb-bb58ec6d10e6"
+version = "0.3.0"
 authors = ["barabule <werner.zanzinger@gmail.com>"]
-version = "0.2.0"
 
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
@@ -10,6 +10,7 @@ FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Observables = "510215fc-4207-5dde-b226-833fc4488ee2"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
@@ -19,4 +20,5 @@ FileIO = "1.17.1"
 GLMakie = "0.13.6"
 LinearAlgebra = "1.11.0"
 Observables = "0.5.5"
+Pkg = "1.12.0"
 StaticArrays = "1.9.15"

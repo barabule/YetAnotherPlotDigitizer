@@ -56,9 +56,12 @@ function main(;
     PZ=  zero(Point2f)
     
     is_colorgrid_visible = Observable(false)
+    assets_folder = joinpath(dirname(@__DIR__), "assets")
     
     init_img = try
-        rotr90(load("assets/example_raster_plot.jpg"))
+        fn = joinpath(assets_folder, "example_raster_plot.jpg")
+        # @info fn
+        rotr90(load(fn))
     catch
         fill(RGB(0.1, 0.1, 0.1), 640, 480)
     end
@@ -115,7 +118,7 @@ function main(;
     #######LAYOUT#######################################################################################################
 
 
-    fig = Figure()
+    fig = Figure(size = (800, 600))
     
     ax_img = Axis(fig[1,1], aspect = DataAspect(), tellheight=  false, tellwidth = false)
     deregister_interaction!(ax_img, :rectanglezoom) #just gets in the way when dragging
