@@ -97,7 +97,7 @@ function main(;
                     :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
-                    :is_bezier => true, #indicates if the current curve is bezier or interpolating
+                    :is_bezier => Observable(true), #indicates if the current curve is bezier or interpolating
 
     ) #holds everything
     
@@ -113,7 +113,6 @@ function main(;
             )
     BigDataStore[:ALL_CURVES] = [ntinit]
 
-    # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
 
     # Variables to store the state during a drag operation
     dragged_index = -1 #index to the closest vertex
@@ -141,6 +140,9 @@ function main(;
     color_option_grid = GridLayout()
     HIDDEN_GL = GridLayout(bbox = (-200, -100, 0, 100)) #used to swap the color buttons when "hidden"
     
+    CURVE_TYPE_GL = GridLayout(SIDEBAR[5,1]) # menu to select interpolation type
+
+
     BOTTOMBAR = GridLayout(fig[2,1], tellwidth =false, height = bottombar_height)#other stuff?
 
     
@@ -227,6 +229,17 @@ function main(;
                       )
 
 
+    ####################    CURVE TYPE     #############################################################################
+
+    menu_curve_type = Menu(fig, options = zip(InterpolationTypeNames, InterpolationTypeList),
+                            default = "Bezier")
+
+    CURVE_TYPE_GL[1,1] = vgrid!(
+                    hgrid!( Label(fig, "Curve type "), menu_curve_type)
+    )
+
+
+
     ####################    PLOTS     ##################################################################################
 
     
@@ -280,21 +293,33 @@ function main(;
 
     ### WORKAROUND
 
-    SmoothPoints = lift(BigDataStore[:current_curve]) do cc
-        idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
-        idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
-        cc.points[idx_main_cp[idx_smooth]]
+    SmoothPoints = lift(BigDataStore[:current_curve], BigDataStore[:is_bezier]) do cc, is_bez
+        if is_bez
+            idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
+            idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
+            return cc.points[idx_main_cp[idx_smooth]]
+        else
+            return cc.points
+        end
     end
 
-    SharpPoints = lift(BigDataStore[:current_curve]) do cc
-        idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
-        idx_sharp = filter(i -> !cc.is_smooth[i], eachindex(cc.is_smooth))
-        cc.points[idx_main_cp[idx_sharp]]
+    SharpPoints = lift(BigDataStore[:current_curve], BigDataStore[:is_bezier]) do cc, is_bez
+        if is_bez
+            idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
+            idx_sharp = filter(i -> !cc.is_smooth[i], eachindex(cc.is_smooth))
+            return cc.points[idx_main_cp[idx_sharp]]
+        else
+            return Vector{eltype(cc.points)}()
+        end
     end
 
-    HandlePoints = lift(BigDataStore[:current_curve]) do cc
-        idx_handle_pts = filter(i -> !is_control_point(i), eachindex(cc.points))
-        cc.points[idx_handle_pts]
+    HandlePoints = lift(BigDataStore[:current_curve], BigDataStore[:is_bezier]) do cc, is_bez
+        if is_bez
+            idx_handle_pts = filter(i -> !is_control_point(i), eachindex(cc.points))
+            return cc.points[idx_handle_pts]
+        else
+            return Vector{eltype(cc.points)}()
+        end
     end
 
     scatter!(ax_img, HandlePoints,
@@ -471,6 +496,12 @@ function main(;
             status_text[] = "Changed $axis scaling to $stext"
         end
     end
+
+
+    on(menu_curve_type.selection) do s
+        BigDataStore[:is_bezier][] = s==:bezier
+    end
+
 
     ##########################     RESET    ############################################################################
     ## TODO better reset

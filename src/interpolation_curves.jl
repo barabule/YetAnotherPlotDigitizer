@@ -2,6 +2,7 @@
 ITP = DataInterpolations.AbstractInterpolation
 #allowable interpolation types
 const InterpolationTypeList = (
+    :bezier,
     :linear,
     :akima,
     :constant,
@@ -13,6 +14,7 @@ const InterpolationTypeList = (
 )
 
 const InterpolationTypeNames = (
+    "Bezier",
     "Linear",
     "Akima",
     "Constant",
@@ -25,6 +27,9 @@ const InterpolationTypeNames = (
 
 
 function make_new_interpolator(pts::Vector{PT}, interpolatortype::Symbol) where PT
+    if interpolatortype == :bezier
+        return nothing 
+    end
     u, t = last.(pts), first.(pts)
     if !in(interpolatortype, InterpolationTypeList)
         error("Interpolation type not found: $(interpolatortype)")
@@ -117,9 +122,9 @@ function add_point!(pts::Vector{PT}, pos) where PT
 end
 
 function minimum_points(itp_type::Symbol)
-    if itp_type == :akima || itp_type == :cubicspline || itp_type == :quadratic || itp_type == :pchip
+    if in(itp_type, (:akima, :cubicspline, :quadratic, :pchip) )
         return 3
-    elseif itp_type == :bspline
+    elseif in(itp_type, (:bspline, :bezier) )
         return 4 #degree 3
     else
         return 2
