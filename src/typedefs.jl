@@ -45,11 +45,15 @@ end
 
 
 function number_of_segments(C::CubicBezierCurve)
-    N = length(C.points)
+    
     # 4 -> 1s; 7->2; 10-> 3 etc
-    return div(N-1, 3)
+    return number_of_cubic_segments(C.points)
 end
 
+function number_of_cubic_segments(pts::Vector{PT}) where PT
+    N = length(pts)
+    div(N-1, 3)
+end
 
 function add_segment!(C::CubicBezierCurve,  
                         segment_id::Integer)

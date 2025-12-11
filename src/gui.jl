@@ -7,6 +7,7 @@ function main(;
         PICK_THRESHOLD = 20,
         MARKER_SIZE = 25,
         SCALE_MARKER_SIZE = 12,
+        number_of_fine_points = 1000,
         )
 
     #######GLOBALS###########################
@@ -97,7 +98,8 @@ function main(;
                     :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
-                    :is_bezier => Observable(true), #indicates if the current curve is bezier or interpolating
+                    :current_curve_type => Observable(:bezier), #indicates if the current curve is bezier or interpolating
+                    :number_of_fine_points => number_of_fine_points, #no of points to plot for fine curves
 
     ) #holds everything
     
@@ -293,8 +295,8 @@ function main(;
 
     ### WORKAROUND
 
-    SmoothPoints = lift(BigDataStore[:current_curve], BigDataStore[:is_bezier]) do cc, is_bez
-        if is_bez
+    SmoothPoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_type]) do cc, ct
+        if is_bezier(ct)
             idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
             idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
             return cc.points[idx_main_cp[idx_smooth]]
@@ -303,8 +305,8 @@ function main(;
         end
     end
 
-    SharpPoints = lift(BigDataStore[:current_curve], BigDataStore[:is_bezier]) do cc, is_bez
-        if is_bez
+    SharpPoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_type]) do cc, ct
+        if is_bezier(ct)
             idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
             idx_sharp = filter(i -> !cc.is_smooth[i], eachindex(cc.is_smooth))
             return cc.points[idx_main_cp[idx_sharp]]
@@ -313,8 +315,8 @@ function main(;
         end
     end
 
-    HandlePoints = lift(BigDataStore[:current_curve], BigDataStore[:is_bezier]) do cc, is_bez
-        if is_bez
+    HandlePoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_type]) do cc, ct
+        if is_bezier(ct)
             idx_handle_pts = filter(i -> !is_control_point(i), eachindex(cc.points))
             return cc.points[idx_handle_pts]
         else
@@ -412,7 +414,7 @@ function main(;
                color = new_color,
                points= pts,
                is_smooth = [false, false],
-               curve_type = :bezier, #default
+               curve_type = menu_curve_type.selection[], 
                )     
         
         push!(BigDataStore[:ALL_CURVES], nt)
@@ -423,7 +425,7 @@ function main(;
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
         status_text[] = "Added new curve $new_name"
         menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
-        menu_curve_type.i_selected[] = 1 #bezier
+        # menu_curve_type.i_selected[] = 1 #bezier
     end
 
     on(btn_rem_curve.clicks) do _
@@ -458,6 +460,10 @@ function main(;
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
         
         status_text[] = "Editing curve $(cdata.name)"
+        # AC = BigDataStore[:ALL_CURVES]
+        # for nt in AC
+        #     @info "Curve type", nt.curve_type
+        # end
     end
 
     
@@ -474,6 +480,7 @@ function main(;
         menu_curves.i_selected[] = id
         label_curve_name.text[] = "Current curve: $s"
         status_text[] = "Changed curve from $old_name to $s"
+        
     end
 
     on(BigDataStore[:current_color]) do c
@@ -504,10 +511,13 @@ function main(;
 
 
     on(menu_curve_type.selection) do s
-        BigDataStore[:is_bezier][] = s==:bezier
+        BigDataStore[:current_curve_type][] = s
         update_curve!(BigDataStore; curve_type = s)
-        # @info "s", s
-        # @info "current curve", BigDataStore[:ALL_CURVES]
+        # AC = BigDataStore[:ALL_CURVES]
+        # for (i, crv) in enumerate(AC)
+        #     @info "curve $i type", crv.curve_type
+        # end
+
     end
 
 
@@ -780,7 +790,7 @@ function update_curve!(D::Dict{Symbol, Any}; name = nothing,
     color = isnothing(color) ? nt.color : color
     points = isnothing(points) ? nt.points : points
     is_smooth = isnothing(is_smooth) ? nt.is_smooth : is_smooth
-    curve_type = isnothing(curve_type) ? :bezier : curve_type
+    curve_type = isnothing(curve_type) ? nt.curve_type : curve_type
     # @info "n", name, "c", color, "pts", length(points), "sm", is_smooth 
     @assert typeof(name) == typeof(nt.name)
 
@@ -823,7 +833,7 @@ function rebuild_menu_options!(menu, ALL_CURVES)
 end
 
 
-function switch_other_curves_plot!(ax, all_curves, id, plot_handles)
+function switch_other_curves_plot!(ax, all_curves, id, plot_handles; N = 1000)
     #delete old plots
     if !isnothing(plot_handles) || !isempty(plot_handles)
         for plt in plot_handles
@@ -839,7 +849,15 @@ function switch_other_curves_plot!(ax, all_curves, id, plot_handles)
     if !isnothing(ids)
         for i in ids
             crv = all_curves[i]
-            pts = piecewise_cubic_bezier(crv.points)
+            if crv.curve_type == :bezier
+                nseg = number_of_cubic_segments(crv.points)
+                N_segments = round(Int, N / nseg)
+                pts = piecewise_cubic_bezier(crv.points; N_segments)
+            else
+                @info "points", crv.points
+                interpolator = make_new_interpolator(crv.points, crv.curve_type)
+                pts = eval_pts(interpolator; N)
+            end
             color = crv.color
             push!(plot_handles, lines!(ax, pts, color= color))
         end
@@ -989,4 +1007,8 @@ function initial_curve(D::Dict{Symbol, Any}; reset = false)
         update_current_curve_controls!(D)
     end
     return ntinit
+end
+
+function is_bezier(s::Symbol)
+    return s == :bezier
 end
