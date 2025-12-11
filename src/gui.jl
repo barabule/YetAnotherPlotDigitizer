@@ -524,13 +524,24 @@ function main(;
 
 
     on(menu_curve_type.selection) do s
+        pts = BigDataStore[:current_curve_pts][]
+        N = length(pts)
+        if !has_valid_number_of_points(N, s) #do something to make it valid for the current itp
+            reset_curve!(pts, s) #simplest case
+            BigDataStore[:current_curve_pts][] = pts
+        end
+        if s == :bezier
+            BigDataStore[:current_curve][] = CubicBezierCurve(pts; all_sharp = true)
+        else
+            # t must be  sorted for the other interpolation types...
+            make_valid!(pts, s)
+            BigDataStore[:current_curve_pts][] = pts
+        end
+        
         BigDataStore[:current_curve_type][] = s
+        
         update_curve!(BigDataStore; curve_type = s)
-        # AC = BigDataStore[:ALL_CURVES]
-        # for (i, crv) in enumerate(AC)
-        #     @info "curve $i type", crv.curve_type
-        # end
-
+        
     end
 
 
@@ -852,7 +863,10 @@ function update_curve!(D::Dict{Symbol, Any}; name = nothing,
     # @info "no assertion errors"
     @assert typeof(points) == typeof(nt.points)
     @assert eltype(is_smooth) == eltype(is_smooth)
-    @assert length(is_smooth) == div(length(points)-1,3)+1 
+    if curve_type == :bezier && !(length(is_smooth) == div(length(points)-1,3)+1)
+        #make it the correct length
+        is_smooth = fill(false, div(length(points)-1,3)+1)
+    end
     @assert typeof(curve_type) == Symbol
 
     D[:ALL_CURVES][D[:edited_curve_id][]] = (;name, color, points, is_smooth, curve_type)

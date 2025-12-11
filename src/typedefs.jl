@@ -32,14 +32,18 @@ struct CubicBezierCurve{PT<:Point2{<:Real}}
 end
 
 
-function CubicBezierCurve(pts::Vector{PT}) where PT
+function CubicBezierCurve(pts::Vector{PT}; all_sharp = false) where PT
     npts = length(pts)
     #4-7-10-13-17 etc are valid lengths
     nsegs = div(npts-1, 3)
     nsegs >= 1 || return nothing
-    is_smooth = fill(true, nsegs+1)
-    is_smooth[1] = false
-    is_smooth[end] = false
+    if !all_sharp
+        is_smooth = fill(true, nsegs + 1)
+        is_smooth[1] = false
+        is_smooth[end] = false
+    else
+        is_smooth = fill(false, nsegs + 1)
+    end
     return CubicBezierCurve(pts, is_smooth)
 end
 

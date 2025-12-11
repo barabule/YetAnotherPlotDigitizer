@@ -143,13 +143,64 @@ end
 
 function has_valid_number_of_points(pts::Vector{PT}, itp::Symbol) where PT
     N = length(pts)
-    return has_valid_number_of_points(N, itp)
+    has_valid_number_of_points(N, itp)
 end
 
 function has_valid_number_of_points(N::Integer, itp::Symbol)
     ret = N >= minimum_points(itp)
-    if ipt == :bezier
+    if itp == :bezier
         ret = ret && (mod(N-1, 3) == 0) #4, 7, 10, 13 etc
+        
     end
+
     ret
+end
+
+
+function reset_curve!(pts::Vector{PT}, itp::Symbol) where PT
+    N = length(pts)
+    
+    Nmin = minimum_points(itp)
+    N == Nmin && return nothing #no point
+
+    P1, PN = pts[1], pts[N]
+
+    if N > Nmin && itp == :bezier # delete some points in the 'middle' to get a valid cubic bezier
+        next_N = 3 * (div(N-1,3)) + 1 #next valid no of control points
+        @assert next_N <= N
+        #we have at least 4 points, and want to preserve the starting and ending tangency
+        m = N - next_N
+        idx = 3:3+m-1
+        deleteat!(pts, idx)
+
+    elseif N<Nmin #return the minimum viable amount of points in a line from the 1st to the last point in pts
+        m = Nmin - N
+        push!(pts, fill(zero(PT), m)...)
+        dt = 1/(Nmin-1)
+        for i in 1:Nmin
+            t = (i-1) * dt
+            pts[i] = P1 * (1-t) + PN * t
+        end
+    end
+    
+    return nothing
+end
+
+function make_valid!(pts::Vector{PT}, itp::Symbol) where PT
+    itp == :bezier && return nothing
+
+    ordering = sign(last(pts)[1]- first(pts)[1]) # 1 for increasing, -1 for decreasing
+    for i in eachindex(pts)
+        i==firstindex(pts) && continue
+
+        ti = pts[i][1]
+        ti_before = pts[i-1][1]
+
+        if sign(ti - ti_before) != ordering 
+            dti = i==lastindex(pts) ? pts[i][1] - pts[i-1][1] : pts[i+1][1] - pts[i][1]
+            
+            pts[i] = PT(ti_before + ordering * dti*1e-3, pts[i][2]) #shift ti to be 'after ti_before'
+        end
+    end
+    return nothing
 end
