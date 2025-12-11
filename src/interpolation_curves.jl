@@ -25,6 +25,7 @@ const InterpolationTypeNames = (
     # "BSpline",
 )
 
+ITP_Dict = Dict{Symbol, Integer}(InterpolationTypeList[i] => i  for i in eachindex(InterpolationTypeList))
 
 function make_new_interpolator(pts::Vector{PT}, interpolatortype::Symbol) where PT
     if interpolatortype == :bezier

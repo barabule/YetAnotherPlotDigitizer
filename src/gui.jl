@@ -412,7 +412,8 @@ function main(;
                color = new_color,
                points= pts,
                is_smooth = [false, false],
-               curve_type = :bezier)     
+               curve_type = :bezier, #default
+               )     
         
         push!(BigDataStore[:ALL_CURVES], nt)
         BigDataStore[:edited_curve_id][] = inext
@@ -422,6 +423,7 @@ function main(;
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
         status_text[] = "Added new curve $new_name"
         menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
+        menu_curve_type.i_selected[] = 1 #bezier
     end
 
     on(btn_rem_curve.clicks) do _
@@ -450,8 +452,11 @@ function main(;
         BigDataStore[:edited_curve_id][] = s
         cdata = BigDataStore[:ALL_CURVES][s]
         
+        menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
+
         update_current_curve_controls!(BigDataStore)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
+        
         status_text[] = "Editing curve $(cdata.name)"
     end
 
@@ -500,6 +505,9 @@ function main(;
 
     on(menu_curve_type.selection) do s
         BigDataStore[:is_bezier][] = s==:bezier
+        update_curve!(BigDataStore; curve_type = s)
+        # @info "s", s
+        # @info "current curve", BigDataStore[:ALL_CURVES]
     end
 
 
@@ -568,7 +576,7 @@ function main(;
                     )
         status_text[] = "Exported files!"
     end
-    ##################   MOUSE Interaction   ###########################################################################
+######################   MOUSE Interaction   ###########################################################################
     
     on(events(ax_img.scene).mousebutton, priority = 20) do event
         # Only react to left mouse button press
@@ -799,6 +807,7 @@ function update_current_curve_controls!(D::Dict{Symbol, Any}, cdata=nothing)
     current_color[] = cdata.color 
     current_curve[] = CubicBezierCurve(cdata.points, cdata.is_smooth)
     crv_label.text[] = "Current curve: $(cdata.name)"
+
     return nothing
 end
 
