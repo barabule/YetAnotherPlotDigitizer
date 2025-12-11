@@ -435,7 +435,9 @@ function main(;
         rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
         
         update_current_curve_controls!(BigDataStore, nt)
+        
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
+        
         status_text[] = "Added new curve $new_name"
         menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
         # menu_curve_type.i_selected[] = 1 #bezier
@@ -457,7 +459,7 @@ function main(;
         end
     end
 
-
+    # TODO proper update - issue with curve_pts
     on(menu_curves.selection) do s
         if BigDataStore[:edited_curve_id][] == s || isnothing(s)
             return nothing
@@ -528,7 +530,7 @@ function main(;
         N = length(pts)
         if !has_valid_number_of_points(N, s) #do something to make it valid for the current itp
             reset_curve!(pts, s) #simplest case
-            BigDataStore[:current_curve_pts][] = pts
+            # BigDataStore[:current_curve_pts][] = pts
         end
         if s == :bezier
             BigDataStore[:current_curve][] = CubicBezierCurve(pts; all_sharp = true)
@@ -570,8 +572,8 @@ function main(;
         reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
         # @info "reset"
         ntinit = initial_curve(BigDataStore; reset = true)
-            
-            
+        BigDataStore[:current_curve_type][] = :bezier
+        menu_curve_type.i_selected[] = ITP_Dict[:bezier] #1
         status_text[] = "New image imported!"   
         
         # @info BigDataStore        
@@ -599,6 +601,7 @@ function main(;
                 end
             end
         end
+         
         export_curves(BigDataStore[:ALL_CURVES], 
                     BigDataStore[:scale_rect][], 
                     BigDataStore[:plot_range][], 
@@ -880,7 +883,13 @@ function update_current_curve_controls!(D::Dict{Symbol, Any}, cdata=nothing)
     TB, current_color, current_curve, crv_label = curve_controls
     # TB.placeholder[] = cdata.name #this doesn't do anything
     current_color[] = cdata.color 
-    current_curve[] = CubicBezierCurve(cdata.points, cdata.is_smooth)
+    ct = D[:current_curve_type][]
+    if ct == :bezier 
+        current_curve[] = CubicBezierCurve(cdata.points, cdata.is_smooth)
+    else
+        D[:current_curve_pts][] = cdata.points
+    end
+
     crv_label.text[] = "Current curve: $(cdata.name)"
 
     return nothing
@@ -919,7 +928,7 @@ function switch_other_curves_plot!(ax, all_curves, id, plot_handles; N = 1000)
                 N_segments = round(Int, N / nseg)
                 pts = piecewise_cubic_bezier(crv.points; N_segments)
             else
-                @info "points", crv.points
+                # @info "points", crv.points
                 interpolator = make_new_interpolator(crv.points, crv.curve_type)
                 pts = eval_pts(interpolator; N)
             end
@@ -950,15 +959,29 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
     end
 
     for crv in ALL_CURVES
+        ct = crv.curve_type
+        pts = crv.points
         if isnothing(export_folder)
             fn = crv.name * ext
         else
             fn = joinpath(export_folder, crv.name * ext)
         end
+
         if sample_horizontal
-            data = sample_cubic_bezier_curve_horizontally(crv.points; samples = N, lut_samples = 200)
-        else
-            data = sample_cubic_bezier_curve(crv.points; samples = N, lut_samples = 200)
+            if ct == :bezier
+                data = sample_cubic_bezier_curve_horizontally(pts; samples = N, lut_samples = 200)
+            else
+                interpolator = make_new_interpolator(pts,ct)
+                data = eval_pts(interpolator; N)
+            end
+
+        else #arclen
+            if ct == :bezier
+                data = sample_cubic_bezier_curve(pts; samples = N, lut_samples = 200)
+            else
+                interpolator = make_new_interpolator(pts, ct)
+                data = eval_pts_arclen(interpolator; N)
+            end
         end
         
         #needs to be transformed

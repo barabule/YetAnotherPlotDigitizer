@@ -102,9 +102,46 @@ function eval_pts(itp::ITP; N= 1000)
     t = itp.t
     ti = LinRange(first(t), last(t), N)
     ui = itp(ti)
-    
     return [SVector{2}(ti[i], ui[i]) for i in eachindex(ti)]
 end
+
+
+function eval_pts_arclen(itp::ITP; N = 1000, LUT_size = 100)
+    t = itp.t
+    u = itp.u
+
+    tlut = LinRange(first(t), last(t), LUT_size)
+    LUT = cumsum(itp(tlut)) #arclen lut
+    Ltotal = last(LUT)
+
+    Li = LinRange(0, Ltotal, N)
+    
+    P1 = SVector{2}(first(tlut), first(LUT))
+    PT = typeof(P1)
+    out = [P1]
+    previndex = 1
+    for i in 2:N-1
+        Ltarget = Li[i]
+        for j in previndex+1:lastindex(LUT)
+            if LUT[j] > Ltarget
+                previndex = j-1
+                break
+            end
+        end
+        s = (Ltarget - LUT[previndex]) / (LUT[previndex + 1] - LUT[previndex])
+        s1, s2 = tlut[previndex], tlut[previndex+1]
+        tout = s1 * (1- s) + s2 * s
+        tout = clamp(tout, first(t), last(t))#prevent going out of bounds
+        push!(out, PT(tout, itp(tout)))
+
+    end
+   
+    push!(out, PT(last(t),last(u)))
+    @assert length(out) == N "ups"
+    return out
+end
+
+
 
 
 function add_point!(pts::Vector{PT}, pos) where PT
