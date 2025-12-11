@@ -271,7 +271,17 @@ function main(;
         pts = C.points
     end
 
-    bezier_curve = @lift piecewise_cubic_bezier($CC; N_segments = 50)
+    bezier_curve = lift(CC, BigDataStore[:current_curve_type]) do C, ct
+        N = BigDataStore[:number_of_fine_points]
+        if ct == :bezier
+            nseg = number_of_cubic_segments(C)
+            N_segments = round(Int, N / nseg)
+            return piecewise_cubic_bezier(C; N_segments)
+        else
+            itp = make_new_interpolator(C, ct)
+            return eval_pts(itp; N)
+        end
+    end
     # bezier_curve = lift(BigDataStore[:current_curve]) do CP
     #     pts = CP.points
     #     piecewise_cubic_bezier(pts; N_segments = 50)
@@ -590,59 +600,70 @@ function main(;
     
     on(events(ax_img.scene).mousebutton, priority = 20) do event
         # Only react to left mouse button press
-        if event.button == Mouse.left && event.action == Mouse.press
-            # @info "triggered mouse press"
-            mousepos = Makie.mouseposition(ax_img.scene)
-            dragged_index = -1
-            target_observable = nothing
-            #manual priority
+        if event.button != Mouse.left || event.action != Mouse.press
+            return Consume(false)
+        end
 
-            #try the scaling pts
-            idx = find_closest_point_to_position(BigDataStore[:scale_rect][], mousepos; 
-                                                PICK_THRESHOLD, 
-                                                area= :square)
-            if idx !=-1 && !BigDataStore[:freeze_scale][] #ignore the scale markers if frozen
-                 target_observable = scaling_pts
-                 dragged_index = idx
-                 return Consume(true)   
-            end
-            
-            idx = find_closest_point_to_position(BigDataStore[:current_curve][], mousepos; 
+        # @info "triggered mouse press"
+        mousepos = Makie.mouseposition(ax_img.scene)
+        dragged_index = -1
+        target_observable = nothing
+        #manual priority
+
+        #try the scaling pts
+        idx = find_closest_point_to_position(BigDataStore[:scale_rect][], mousepos; 
+                                            PICK_THRESHOLD, 
+                                            area= :square)
+        if idx !=-1 && !BigDataStore[:freeze_scale][] #ignore the scale markers if frozen
+                target_observable = scaling_pts
+                dragged_index = idx
+                return Consume(true)   
+        end
+        #try the control point curve
+        idx = find_closest_point_to_position(BigDataStore[:current_curve][], mousepos; 
                                                 thresh = PICK_THRESHOLD, 
                                                 area= :square)
-            if idx != -1
-                target_observable = ctrl_lines
-                dragged_index = idx
-                return Consume(true)
-            end
-
-        end
-        return Consume(false)
+        idx == -1 && return Consume(false)
+        # @info "snatched", idx
+        #found something
+        target_observable = ctrl_lines
+        dragged_index = idx
+        return Consume(true)
     end
 
     # Interaction for mouse movement (dragging)
     on(events(ax_img).mouseposition, priority = 10) do mp
-        if dragged_index != -1 && ispressed(fig, Mouse.left)
-            # Convert mouse position (in pixels) to data coordinates
-            new_data_pos = Makie.mouseposition(ax_img.scene)
-            
-            if target_observable === scaling_pts && !BigDataStore[:freeze_scale][]
-                current_points = BigDataStore[:scale_rect][]
-                current_points[dragged_index[]] = new_data_pos
-                BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
-                return Consume(true)
-            end
-            if target_observable === ctrl_lines
-                current_points = BigDataStore[:current_curve][]
-                # move_control_vertices!(current_points, dragged_index[], new_data_pos)
-                move!(current_points, dragged_index, new_data_pos)
-                # @info "moving PT", dragged_index, "num CP", length(current_points.points)
-                BigDataStore[:current_curve][] = current_points # Notify the Observable of the change
-                return Consume(true)
-            end
-            
+        # if dragged_index != -1 && ispressed(fig, Mouse.left)
+        dragged_index != -1 && ispressed(fig, Mouse.left) || return Consume(false)
+        # Convert mouse position (in pixels) to data coordinates
+        new_data_pos = Makie.mouseposition(ax_img.scene)
+        
+        if target_observable === scaling_pts && !BigDataStore[:freeze_scale][]
+            current_points = BigDataStore[:scale_rect][]
+            current_points[dragged_index[]] = new_data_pos
+            BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
+            return Consume(true)
         end
-        return Consume(false)
+        # @info "before", dragged_index
+        target_observable == ctrl_lines || return Consume(false)
+        # @info "ctrl"
+        if BigDataStore[:current_curve_type][] == :bezier
+            # @info "bezier"
+            cubic_curve = BigDataStore[:current_curve][]
+            move!(cubic_curve, dragged_index, new_data_pos)
+            # @info "done bezier"
+        else
+            # @info "itp"
+            current_points = BigDataStore[:current_curve][].points
+            move_itp!(current_points, dragged_index, new_data_pos)
+            cubic_curve = CubicBezierCurve(current_points) #maskerada
+            # @info "after itp"
+        end
+        
+        # @info "moving PT", dragged_index, "num CP", length(current_points.points)
+        BigDataStore[:current_curve][]  = cubic_curve # Notify the Observable of the change
+        return Consume(true)
+         
     end
 
     # Interaction for releasing the mouse button

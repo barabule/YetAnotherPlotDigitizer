@@ -86,7 +86,7 @@ function find_closest(pts::Vector{PT}, pt) where PT
 end
 
 
-function move!(pts::Vector{PT}, idx, position) where PT
+function move_itp!(pts::Vector{PT}, idx, position) where PT
     #check if moving the point would produce an unsorted array 
     t = position[1]
     invalid = (idx !=1 && pts[idx-1][1]>=t) || (idx !=lastindex(pts) && pts[idx+1][1]<= t)
