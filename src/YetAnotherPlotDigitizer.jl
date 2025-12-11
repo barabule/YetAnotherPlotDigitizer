@@ -11,11 +11,12 @@ using FileIO
 using Colors
 using DelimitedFiles
 using Pkg
-
+using DataInterpolations
 
 
 include("typedefs.jl")
 include("bezier.jl")
+include("interpolation_curves.jl")
 include("gui.jl")
 
 export main

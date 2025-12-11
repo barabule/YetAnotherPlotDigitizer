@@ -97,6 +97,7 @@ function main(;
                     :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
+                    :is_bezier => true, #indicates if the current curve is bezier or interpolating
 
     ) #holds everything
     
@@ -104,7 +105,12 @@ function main(;
 
     BigDataStore[:current_curve] = Observable(CubicBezierCurve(get_initial_curve_pts(BigDataStore[:scale_rect][])))
 
-    ntinit = (;name= "Curve 01", color = BigDataStore[:current_color][], points = BigDataStore[:current_curve][].points, is_smooth=[false, false])
+    ntinit = (;name= "Curve 01", 
+            color = BigDataStore[:current_color][], 
+            points = BigDataStore[:current_curve][].points, 
+            is_smooth=[false, false],
+            curve_type = :bezier,
+            )
     BigDataStore[:ALL_CURVES] = [ntinit]
 
     # push!(BigDataStore, :plot_range => Observable([0.0, 1.0, 0.0, 1.0])) #scaling ranges x1, x2, y1, y2
@@ -319,7 +325,8 @@ function main(;
 
     curve_controls = [tb_curve_name, BigDataStore[:current_color], BigDataStore[:current_curve], label_curve_name]
     BigDataStore[:curve_controls] = curve_controls
-    #############BOTTOM#################################################################################################
+
+    #########    BOTTOM    #############################################################################################
 
     btn_export = Button(fig, label="Export", width = 50)
 
@@ -346,7 +353,7 @@ function main(;
                             )           
 
 
-    ###############EVENTS###############################################################################################
+    ###########    EVENTS    ###########################################################################################
     
     on(is_colorgrid_visible) do val
         if val
@@ -379,7 +386,8 @@ function main(;
         nt = (;name = new_name,
                color = new_color,
                points= pts,
-               is_smooth = [false, false])     
+               is_smooth = [false, false],
+               curve_type = :bezier)     
         
         push!(BigDataStore[:ALL_CURVES], nt)
         BigDataStore[:edited_curve_id][] = inext
@@ -724,7 +732,8 @@ end
 function update_curve!(D::Dict{Symbol, Any}; name = nothing,
                         color = nothing,
                         points = nothing,
-                        is_smooth = nothing)
+                        is_smooth = nothing,
+                        curve_type = nothing,)
 
     nt = D[:ALL_CURVES][D[:edited_curve_id][]]
 
@@ -732,9 +741,10 @@ function update_curve!(D::Dict{Symbol, Any}; name = nothing,
     color = isnothing(color) ? nt.color : color
     points = isnothing(points) ? nt.points : points
     is_smooth = isnothing(is_smooth) ? nt.is_smooth : is_smooth
+    curve_type = isnothing(curve_type) ? :bezier : curve_type
     # @info "n", name, "c", color, "pts", length(points), "sm", is_smooth 
     @assert typeof(name) == typeof(nt.name)
-    
+
     # @info "col type", typeof(color), "col t2", typeof(nt.color)
     # @info "col check", typeof(color) == typeof(nt.color)
     
@@ -743,8 +753,9 @@ function update_curve!(D::Dict{Symbol, Any}; name = nothing,
     @assert typeof(points) == typeof(nt.points)
     @assert eltype(is_smooth) == eltype(is_smooth)
     @assert length(is_smooth) == div(length(points)-1,3)+1 
-    
-    D[:ALL_CURVES][D[:edited_curve_id][]] = (;name, color, points, is_smooth)
+    @assert typeof(curve_type) == Symbol
+
+    D[:ALL_CURVES][D[:edited_curve_id][]] = (;name, color, points, is_smooth, curve_type)
 
 end
 
