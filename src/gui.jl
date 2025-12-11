@@ -95,6 +95,7 @@ function main(;
                     #curve data
                     :edited_curve_id => Observable(1), #id of the current curve
                     :current_curve => nothing, #control for current curve
+                    :current_curve_pts => nothing, #holds just the control points
                     :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
@@ -267,7 +268,7 @@ function main(;
     
     #hi res sampling of the current curve
     
-    CC = lift(BigDataStore[:current_curve]) do C
+    BigDataStore[:current_curve_pts] = CC = lift(BigDataStore[:current_curve]) do C
         pts = C.points
     end
 
@@ -305,13 +306,15 @@ function main(;
 
     ### WORKAROUND
 
-    SmoothPoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_type]) do cc, ct
+    SmoothPoints = lift(BigDataStore[:current_curve_pts], BigDataStore[:current_curve_type]) do pts, ct
+        
         if is_bezier(ct)
+            cc = BigDataStore[:current_curve][]
             idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
             idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
             return cc.points[idx_main_cp[idx_smooth]]
         else
-            return cc.points
+            return pts
         end
     end
 
@@ -651,17 +654,18 @@ function main(;
             # @info "bezier"
             cubic_curve = BigDataStore[:current_curve][]
             move!(cubic_curve, dragged_index, new_data_pos)
+            BigDataStore[:current_curve][]  = cubic_curve 
             # @info "done bezier"
         else
             # @info "itp"
-            current_points = BigDataStore[:current_curve][].points
-            move_itp!(current_points, dragged_index, new_data_pos)
-            cubic_curve = CubicBezierCurve(current_points) #maskerada
+            pts = BigDataStore[:current_curve][].points
+            move_itp!(pts, dragged_index, new_data_pos)
+            BigDataStore[:current_curve_pts][] = pts
             # @info "after itp"
         end
         
         # @info "moving PT", dragged_index, "num CP", length(current_points.points)
-        BigDataStore[:current_curve][]  = cubic_curve # Notify the Observable of the change
+        # Notify the Observable of the change
         return Consume(true)
          
     end
@@ -681,35 +685,61 @@ function main(;
 #################   KEYBOARD   #########################################################################################
 
     on(events(ax_img).keyboardbutton, priority = 10) do event
-        if event.action == Keyboard.press
+        event.action == Keyboard.press || return Consume(false)
+
+        if event.key == Keyboard.a # Add point
+            # Check if we have a valid mouse position in data coordinates
+            data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+
+            CT = BigDataStore[:current_curve_type][]
             
-            
-            if event.key == Keyboard.a # Add point
-                # Check if we have a valid mouse position in data coordinates
-                data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+            if CT == :bezier
                 current_points = BigDataStore[:current_curve][]
                 # segid = find_closest_segment(current_points, data_pos)
                 segid = find_closest_projected_segment(current_points, data_pos)
                 add_segment!(current_points, segid)
                 BigDataStore[:current_curve][] = current_points
                 return Consume(true)
+            end
             
-            elseif event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
-                data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+            #not a bezier
+            pts = BigDataStore[:current_curve][].points
+            add_point!(pts, data_pos)
+            BigDataStore[:current_curve_pts][] = pts
+            return Consume(true)
+        end
+
+        if event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
+            data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+            
+            CT = BigDataStore[:current_curve_type][]
+
+            if CT == :bezier
                 current_points = BigDataStore[:current_curve][]
                 cpid = find_closest_control_point_to_position(current_points, data_pos)
                 remove_control_point!(current_points, cpid)
-                BigDataStore[:current_curve][] = current_points
-
-            elseif event.key == Keyboard.s #toggle is_smooth of the closest CP
-                data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
-                current_points = BigDataStore[:current_curve][]
-                cp_id = find_closest_control_point_to_position(current_points, data_pos)
-                toggle_smoothness(current_points, cp_id)
-                BigDataStore[:current_curve][] = current_points
+                BigDataStore[:current_curve][] = current_points 
+                return Consume(true)
             end
-            
+
+            #not a bezier
+            pts = BigDataStore[:current_curve][].points
+            remove_point!(pts, data_pos; min_pts = minimum_points(CT))
+            BigDataStore[:current_curve_pts][] = pts #
+            return Consume(true)
         end
+        
+        if event.key == Keyboard.s #toggle is_smooth of the closest CP
+            BigDataStore[:current_curve_type][] == :bezier || return Consume(true) #no effect for other curve types
+
+            data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+            current_points = BigDataStore[:current_curve][]
+            cp_id = find_closest_control_point_to_position(current_points, data_pos)
+            toggle_smoothness(current_points, cp_id)
+            BigDataStore[:current_curve][] = current_points
+            return Consume(true)
+        end
+
         return Consume(false)
     end
 

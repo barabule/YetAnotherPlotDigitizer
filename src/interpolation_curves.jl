@@ -82,6 +82,7 @@ function find_closest(pts::Vector{PT}, pt) where PT
             idx = i
         end
     end
+    @assert idx != -1
     return idx
 end
 
@@ -133,9 +134,22 @@ function minimum_points(itp_type::Symbol)
 end
 
 
-function remove_point!(pts::Vector{PT}, pos::PT; min_pts = 2) where PT
+function remove_point!(pts::Vector{PT}, pos; min_pts = 2) where PT
     length(pts)<=min_pts && return nothing
     idx = find_closest(pts, pos)
     deleteat!(pts, idx)
     nothing
+end
+
+function has_valid_number_of_points(pts::Vector{PT}, itp::Symbol) where PT
+    N = length(pts)
+    return has_valid_number_of_points(N, itp)
+end
+
+function has_valid_number_of_points(N::Integer, itp::Symbol)
+    ret = N >= minimum_points(itp)
+    if ipt == :bezier
+        ret = ret && (mod(N-1, 3) == 0) #4, 7, 10, 13 etc
+    end
+    ret
 end
