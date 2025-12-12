@@ -109,12 +109,11 @@ function main(;
 
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
 
-    bbox = begin
-        rect = BigDataStore[:scale_rect][]
+    BBOX = lift(BigDataStore[:scale_rect]) do rect
         X1, X2, Y1, Y2 = rect
         (X1[1], X2[1], Y1[2], Y2[2])
     end
-    CDinit = CurveData(bbox, "Curve 1", first(cmap))
+    CDinit = CurveData(BBOX[], "Curve 1", first(cmap))
 
     BigDataStore[:current_curve] = Observable(CDinit)
     BigDataStore[:ALL_CURVES] = [CDinit]
@@ -398,7 +397,14 @@ function main(;
 
 
     ###########    EVENTS    ###########################################################################################
-    
+    on(BigDataStore[:current_curve]) do CD
+        id = BigDataStore[:edited_curve_id][]
+        BigDataStore[:ALL_CURVES][id] = CD
+    end
+
+
+
+
     on(is_colorgrid_visible) do val
         if val
             CC_COLOR_GL[1, 1] = color_option_grid
@@ -419,93 +425,80 @@ function main(;
 
     on(btn_add_curve.clicks) do _
         
-        # #just add a new curve 
-        # inext= length(BigDataStore[:ALL_CURVES])+1
-        # new_name = "Curve $inext"
-        # pts = get_initial_curve_pts(BigDataStore[:scale_rect][])
+        #just add a new curve 
+        inext= length(BigDataStore[:ALL_CURVES])+1
+        new_name = "Curve $inext"
         
+        next_color_id = mod(inext, num_colors) + 1
+        new_color = BigDataStore[:cmap][next_color_id]
 
-        # next_color_id = mod(inext, num_colors) + 1
-        # new_color = BigDataStore[:cmap][next_color_id]
-        # nt = (;name = new_name,
-        #        color = new_color,
-        #        points= pts,
-        #        is_smooth = [false, false],
-        #        curve_type = menu_curve_type.selection[], 
-        #        )     
+        CD = CurveData(BBOX[],new_name, new_color; itp = menu_curve_type.selection[])  
         
-        # push!(BigDataStore[:ALL_CURVES], nt)
-        # BigDataStore[:edited_curve_id][] = inext
-        # rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+        push!(BigDataStore[:ALL_CURVES], CD)
+        BigDataStore[:edited_curve_id][] = inext
+        BigDataStore[:current_curve][] = CD
+        rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
         
-        # update_current_curve_controls!(BigDataStore, nt)
+        update_current_curve_controls!(BigDataStore, CD)
         
-        # switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
+        switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
         
-        # status_text[] = "Added new curve $new_name"
-        # menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
-        # # menu_curve_type.i_selected[] = 1 #bezier
+        status_text[] = "Added new curve $new_name"
+        menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
+        # @info "added new curve $new_name"
+        # @info "ALL CURVES", length(BigDataStore[:ALL_CURVES])
+        # @info "edited id", BigDataStore["edited_curve_id"][]
+        # @info "current curve", BigDataStore[:current_curve][]
     end
 
     on(btn_rem_curve.clicks) do _
         #remove the current curve
-        # num_curves = length(BigDataStore[:ALL_CURVES])
-        # if num_curves >1
-        #     id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
-        #     old_name = BigDataStore[:ALL_CURVES][id_delete].name
-        #     deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
-        #     rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
-        #     BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
-        #     update_current_curve_controls!(BigDataStore)#we should also update the color etc...
-        #     switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
-        #                         BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
-        #     status_text[] = "Removed curve $old_name"
-        # end
+        num_curves = length(BigDataStore[:ALL_CURVES])
+        if num_curves >1
+            id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
+            old_name = BigDataStore[:ALL_CURVES][id_delete].name
+            deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
+            rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+            BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
+            update_current_curve_controls!(BigDataStore)#we should also update the color etc...
+            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
+                                BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
+            status_text[] = "Removed curve $old_name"
+        end
     end
 
     # TODO proper update - issue with curve_pts
     on(menu_curves.selection) do s
-        # if BigDataStore[:edited_curve_id][] == s || isnothing(s)
-        #     return nothing
-        # end
+        if BigDataStore[:edited_curve_id][] == s || isnothing(s)
+            return nothing
+        end
         
         
-        # BigDataStore[:edited_curve_id][] = s
-        # cdata = BigDataStore[:ALL_CURVES][s]
-        # BigDataStore[:current_curve_type][] = cdata.curve_type
+        BigDataStore[:edited_curve_id][] = s
+        cdata = BigDataStore[:ALL_CURVES][s]
+        BigDataStore[:current_curve][] = cdata
 
-        # ct = cdata.curve_type
-        # if ct == :bezier 
-        #     BigDataStore[:current_curve][] = CubicBezierCurve(cdata.points, cdata.is_smooth)
-        # else
-        #     BigDataStore[:current_curve_pts][] = cdata.points
-        # end
-        
-        # update_current_curve_controls!(BigDataStore)
-        # switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
+        update_current_curve_controls!(BigDataStore)
+        switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
 
-        # menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
-        # status_text[] = "Editing curve $(cdata.name)"
-        # # AC = BigDataStore[:ALL_CURVES]
-        # # for nt in AC
-        # #     @info "Curve type", nt.curve_type
-        # # end
+        menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
+        status_text[] = "Editing curve $(cdata.name)"
     end
 
     
 
     on(tb_curve_name.stored_string) do s
-        # id = BigDataStore[:edited_curve_id][]
-        # old_name = BigDataStore[:ALL_CURVES][id].name
-        # update_curve!(BigDataStore; name = s)
+        id = BigDataStore[:edited_curve_id][]
+        old_name = BigDataStore[:ALL_CURVES][id].name
+        BigDataStore[:current_curve][] = update(BigDataStore[:current_curve][]; name = s)
         # #also update the menu entry
-        # opts = menu_curves.options[]
+        opts = menu_curves.options[]
         # # @info "opts", opts
-        # opts[id] = (s, opts[id][2])
-        # menu_curves.options[] = opts
-        # menu_curves.i_selected[] = id
-        # label_curve_name.text[] = "Current curve: $s"
-        # status_text[] = "Changed curve from $old_name to $s"
+        opts[id] = (s, opts[id][2])
+        menu_curves.options[] = opts
+        menu_curves.i_selected[] = id
+        label_curve_name.text[] = "Current curve: $s"
+        status_text[] = "Changed curve from $old_name to $s"
         
     end
 
@@ -830,9 +823,9 @@ function update_current_curve_controls!(D::Dict{Symbol, Any}, cdata=nothing)
     curve_controls = D[:curve_controls] 
     cdata = isnothing(cdata) ? D[:ALL_CURVES][D[:edited_curve_id][]] : cdata
 
-    TB, current_color, current_curve, crv_label = curve_controls
+    TB, current_curve, crv_label = curve_controls
     # TB.placeholder[] = cdata.name #this doesn't do anything
-    current_color[] = cdata.color 
+    # current_color[] = cdata.color 
     
 
     crv_label.text[] = "Current curve: $(cdata.name)"
@@ -865,22 +858,12 @@ function switch_other_curves_plot!(ax, all_curves, id, plot_handles; N = 1000)
     #gather new curves to plot
     ids = filter(i -> i!=id, eachindex(all_curves))
     # @info "ids", ids, "id", id
-    if !isnothing(ids)
-        for i in ids
-            crv = all_curves[i]
-            if crv.curve_type == :bezier
-                nseg = number_of_cubic_segments(crv.points)
-                N_segments = round(Int, N / nseg)
-                pts = piecewise_cubic_bezier(crv.points; N_segments)
-            else
-                # @info "points", crv.points
-                interpolator = make_new_interpolator(crv.points, crv.curve_type)
-                pts = eval_pts(interpolator; N)
-            end
-            color = crv.color
-            push!(plot_handles, lines!(ax, pts, color= color))
-        end
-        
+    isnothing(ids) && return nothing
+    for i in ids
+        CD = all_curves[i]
+        pts = eval_curve(CD)
+        color = CD.color
+        push!(plot_handles, lines!(ax, pts, color= color))
     end
     return nothing
 end
@@ -903,31 +886,14 @@ function export_curves(ALL_CURVES, scale_rect, plot_range, scale_type;
         ext ,delim = ".txt", ';'
     end
 
-    for crv in ALL_CURVES
-        ct = crv.curve_type
-        pts = crv.points
+    for CD in ALL_CURVES
         if isnothing(export_folder)
-            fn = crv.name * ext
+            fn = CD.name * ext
         else
-            fn = joinpath(export_folder, crv.name * ext)
+            fn = joinpath(export_folder, CD.name * ext)
         end
 
-        if sample_horizontal
-            if ct == :bezier
-                data = sample_cubic_bezier_curve_horizontally(pts; samples = N, lut_samples = 200)
-            else
-                interpolator = make_new_interpolator(pts,ct)
-                data = eval_pts(interpolator; N)
-            end
-
-        else #arclen
-            if ct == :bezier
-                data = sample_cubic_bezier_curve(pts; samples = N, lut_samples = 200)
-            else
-                interpolator = make_new_interpolator(pts, ct)
-                data = eval_pts_arclen(interpolator; N)
-            end
-        end
+        data = sample_curve(CD; samples = N, arclen = !sample_horizontal)
         
         #needs to be transformed
         X1, X2, Y1, Y2 = scale_rect
