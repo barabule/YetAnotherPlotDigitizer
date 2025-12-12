@@ -285,7 +285,7 @@ function main(;
     # SMOOTH EDITED CURVE
     fine_curve_points = lift(BigDataStore[:current_curve]) do CD
         N = BigDataStore[:number_of_fine_points]
-        eval_curve(CD; N)
+        eval_curve(CD; samples = N)
     end
     
     
@@ -445,10 +445,7 @@ function main(;
         
         status_text[] = "Added new curve $new_name"
         menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
-        # @info "added new curve $new_name"
-        # @info "ALL CURVES", length(BigDataStore[:ALL_CURVES])
-        # @info "edited id", BigDataStore["edited_curve_id"][]
-        # @info "current curve", BigDataStore[:current_curve][]
+        
     end
 
     on(btn_rem_curve.clicks) do _
@@ -468,7 +465,7 @@ function main(;
             update_current_curve_controls!(BigDataStore)#we should also update the color etc...
             switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
                                 BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
-                                
+
             menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
             status_text[] = "Removed curve $old_name"
         end
@@ -579,35 +576,35 @@ function main(;
 
     on(tb_export_num.stored_string) do s
         # n = 10
-        # try n = parse(Int, s); catch; end
-        # BigDataStore[:num_export][] = max(10, n)
-        # status_text[] = "Curve export density = $n points"
+        try n = parse(Int, s); catch; end
+        BigDataStore[:num_export][] = max(10, n)
+        status_text[] = "Curve export density = $n points"
     end
 
     on(btn_export.clicks) do _
-        # N = BigDataStore[:num_export][]
-        # format = menu_export.selection[]
-        # #check if the are negative numbers when log scale range
-        # for i in 1:2
-        #     if BigDataStore[:scale_type][][i] == :log
-        #         if BigDataStore[:plot_range][][2i-1] <= 0 || BigDataStore[:plot_range][][2i] <= 0 
-        #             status_text[] =  "Cannot export, log scaling needs positive numbers.\n
-        #                             Please set the X1, X2, Y1 or Y2 to be positive!"
-        #             return nothing
-        #         end
-        #     end
-        # end
+        N = BigDataStore[:num_export][]
+        format = menu_export.selection[]
+        #check if the are negative numbers when log scale range
+        for i in 1:2
+            if BigDataStore[:scale_type][][i] == :log
+                if BigDataStore[:plot_range][][2i-1] <= 0 || BigDataStore[:plot_range][][2i] <= 0 
+                    status_text[] =  "Cannot export, log scaling needs positive numbers.\n
+                                    Please set the X1, X2, Y1 or Y2 to be positive!"
+                    return nothing
+                end
+            end
+        end
          
-        # export_curves(BigDataStore[:ALL_CURVES], 
-        #             BigDataStore[:scale_rect][], 
-        #             BigDataStore[:plot_range][], 
-        #             BigDataStore[:scale_type][];
-        #             N, 
-        #             format, 
-        #             export_folder = BigDataStore[:export_folder],
-        #             sample_horizontal = BigDataStore[:export_horizontal][],
-        #             )
-        # status_text[] = "Exported files!"
+        export_curves(BigDataStore[:ALL_CURVES], 
+                    BigDataStore[:scale_rect][], 
+                    BigDataStore[:plot_range][], 
+                    BigDataStore[:scale_type][];
+                    N, 
+                    format, 
+                    export_folder = BigDataStore[:export_folder],
+                    sample_horizontal = BigDataStore[:export_horizontal][],
+                    )
+        status_text[] = "Exported files!"
     end
 ######################   MOUSE Interaction   ###########################################################################
     
@@ -868,7 +865,7 @@ function switch_other_curves_plot!(ax, all_curves, id, plot_handles; N = 1000)
     isnothing(ids) && return nothing
     for i in ids
         CD = all_curves[i]
-        pts = eval_curve(CD)
+        pts = eval_curve(CD; samples = N)
         color = CD.color
         push!(plot_handles, lines!(ax, pts, color= color))
     end

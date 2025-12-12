@@ -150,7 +150,7 @@ function change_curve_type(CD::CurveData, ct::Symbol)
 end
 
 
-function eval_curve(CD::CurveData; N = 1000)# for plotting
+function eval_curve(CD::CurveData; samples = 1000)# for plotting
 
     pts = CD.points
     ct = CD.curve_type
@@ -158,11 +158,11 @@ function eval_curve(CD::CurveData; N = 1000)# for plotting
     if ct == :bezier
         nseg = number_of_cubic_segments(pts)
         # @info "nseg", nseg
-        N_segments = round(Int, N / nseg)
+        N_segments = round(Int, samples / nseg)
         return piecewise_cubic_bezier(pts; N_segments)
     else
         itp = make_new_interpolator(pts, ct)
-        return eval_pts(itp; N)
+        return eval_pts(itp; samples)
     end
     nothing
 end
@@ -186,9 +186,9 @@ function sample_curve(CD::CurveData;
     #not bezier
     interpolator = make_new_interpolator(pts, ct)
     if arclen
-        return eval_pts_arclen(interpolator; N)
+        return eval_pts_arclen(interpolator;  samples)
     else
-        return eval_pts(interpolator; N)
+        return eval_pts(interpolator; samples)
     end
     nothing
 end

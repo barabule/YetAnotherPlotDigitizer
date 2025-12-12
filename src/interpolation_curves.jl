@@ -98,15 +98,15 @@ function move_itp!(pts::Vector{PT}, idx, position) where PT
 end
 
 
-function eval_pts(itp::ITP; N= 1000)
+function eval_pts(itp::ITP; samples= 1000)
     t = itp.t
-    ti = LinRange(first(t), last(t), N)
+    ti = LinRange(first(t), last(t), samples)
     ui = itp(ti)
     return [SVector{2}(ti[i], ui[i]) for i in eachindex(ti)]
 end
 
 
-function eval_pts_arclen(itp::ITP; N = 1000, LUT_size = 100)
+function eval_pts_arclen(itp::ITP; samples = 1000, LUT_size = 100)
     t = itp.t
     u = itp.u
 
@@ -114,13 +114,13 @@ function eval_pts_arclen(itp::ITP; N = 1000, LUT_size = 100)
     LUT = cumsum(itp(tlut)) #arclen lut
     Ltotal = last(LUT)
 
-    Li = LinRange(0, Ltotal, N)
+    Li = LinRange(0, Ltotal, samples)
     
     P1 = SVector{2}(first(tlut), first(LUT))
     PT = typeof(P1)
     out = [P1]
     previndex = 1
-    for i in 2:N-1
+    for i in 2:samples-1
         Ltarget = Li[i]
         for j in previndex+1:lastindex(LUT)
             if LUT[j] > Ltarget
@@ -137,7 +137,7 @@ function eval_pts_arclen(itp::ITP; N = 1000, LUT_size = 100)
     end
    
     push!(out, PT(last(t),last(u)))
-    @assert length(out) == N "ups"
+    @assert length(out) == samples "ups"
     return out
 end
 
