@@ -95,11 +95,11 @@ function main(;
                     #curve data
                     :edited_curve_id => Observable(1), #id of the current curve
                     :current_curve => nothing, #control for current curve
-                    :current_curve_pts => nothing, #holds just the control points
-                    :current_color => Observable(first(cmap)), #color of currently edited curve
+                    # :current_curve_pts => nothing, #holds just the control points
+                    # :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
-                    :current_curve_type => Observable(:bezier), #indicates if the current curve is bezier or interpolating
+                    # :current_curve_type => Observable(:bezier), #indicates if the current curve is bezier or interpolating
                     :number_of_fine_points => number_of_fine_points, #no of points to plot for fine curves
 
     ) #holds everything
@@ -109,17 +109,15 @@ function main(;
 
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
 
-    # BigDataStore[:current_curve] = Observable(CubicBezierCurve(get_initial_curve_pts(BigDataStore[:scale_rect][])))
+    bbox = begin
+        rect = BigDataStore[:scale_rect][]
+        X1, X2, Y1, Y2 = rect
+        (X1[1], X2[1], Y1[2], Y2[2])
+    end
+    CDinit = CurveData(bbox, "Curve 1", first(cmap))
 
-    ntinit = (;name= "Curve 01", 
-            color = BigDataStore[:current_color][], 
-            points = get_initial_curve_pts(BigDataStore[:scale_rect][]), 
-            is_smooth=[false, false],
-            curve_type = :bezier,
-            )
-
-    BigDataStore[:current_curve] = Observable(ntinit)
-    BigDataStore[:ALL_CURVES] = [ntinit]
+    BigDataStore[:current_curve] = Observable(CDinit)
+    BigDataStore[:ALL_CURVES] = [CDinit]
 
 
     # Variables to store the state during a drag operation
@@ -191,8 +189,8 @@ function main(;
     
     #############ALL CURVES#############################################################################################
 
-    menu_curves = Menu(fig, options = [("Curve 01", 1)],
-                        default = "Curve 01", 
+    menu_curves = Menu(fig, options = [(CDinit.name, BigDataStore[:edited_curve_id][])],
+                        default = CDinit.name, 
                         width = 0.5 * sidebar_width
                         )
 
@@ -204,7 +202,7 @@ function main(;
     push!(BigDataStore, :curves_menu => menu_curves)
     #################CURVE##############################################################################################
 
-    tb_curve_name = Textbox(fig, placeholder = "Curve 01", width = 0.7 * sidebar_width)
+    tb_curve_name = Textbox(fig, placeholder = CDinit.name, width = 0.7 * sidebar_width)
 
     btn_add_curve = Button(fig, label = "Add")
     btn_rem_curve = Button(fig, label = "Rem")
@@ -222,14 +220,19 @@ function main(;
                         height = color_btn_height,
                         )
 
-    CURRENT_CURVE_GL[2,1] = hgrid!(btn_color, Box(fig, color = BigDataStore[:current_color], width = 0.4 * sidebar_width))
+    edited_curve_color = lift(BigDataStore[:current_curve]) do CD
+        CD.color
+    end
+
+    CURRENT_CURVE_GL[2,1] = hgrid!(btn_color, 
+                        Box(fig, color = edited_curve_color, width = 0.4 * sidebar_width))
     CC_COLOR_GL[1,1] = empty_layout
 
     HIDDEN_GL[1,1] = color_option_grid
     populate_color_chooser(fig,
                       color_option_grid, 
                       BigDataStore[:cmap], 
-                      BigDataStore[:current_color], 
+                      BigDataStore[:current_curve], 
                       is_colorgrid_visible; 
                       btn_height = color_btn_height,
                       num_color_cols,
@@ -251,8 +254,9 @@ function main(;
     ####################    PLOTS     ##################################################################################
 
     
-
+    #BG Image
     img_plot = image!(ax_img, BigDataStore[:ref_img])
+    #SCALE MARKERS
     scaling_pts = (scatter!(ax_img, BigDataStore[:scale_rect], color = [:red, :red, :green, :green], 
                                 marker = RingBarMarker,
                                 markersize = SCALE_MARKER_SIZE,
@@ -277,72 +281,63 @@ function main(;
     #     pts = C.points
     # end
 
-    BigDataStore[:current_curve_pts] = CC = Observable(BigDataStore[:current_curve][].points) #first time
+    # BigDataStore[:current_curve_pts] = CC = Observable(BigDataStore[:current_curve][].points) #first time
 
-
-    fine_curve_points = lift(BigDataStore[:current_curve], CC, BigDataStore[:current_curve_type]) do CP, C, ct
+    # SMOOTH EDITED CURVE
+    fine_curve_points = lift(BigDataStore[:current_curve]) do CD
         N = BigDataStore[:number_of_fine_points]
-        if ct == :bezier
-
-            nseg = number_of_cubic_segments(CP.points)
-            N_segments = round(Int, N / nseg)
-            return piecewise_cubic_bezier(CP; N_segments)
-        else
-            itp = make_new_interpolator(C, ct)
-            return eval_pts(itp; N)
-        end
+        eval_curve(CD; N)
     end
     
-    cname = lift(BigDataStore[:edited_curve_id]) do id
-        nt = BigDataStore[:ALL_CURVES][id]
-        nt.name
-    end
+    
     edited_curve_fine_plot = lines!(ax_img, fine_curve_points, 
-                                    color = BigDataStore[:current_color], 
+                                    color = edited_curve_color, 
                                     linewidth = 0.2 * MARKER_SIZE,
                                     alpha = 0.6,
                                     linestyle = :solid)
                                     #
 
     
-    
-
-    #control pts
-    control_points = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_pts], BigDataStore[:current_curve_type]) do cc, pts, ct
-        pts = ct == :bezier ? cc.points : pts
+    # CONTROL CAGE LINES
+    control_points = lift(BigDataStore[:current_curve]) do CD
+        CD.points
     end
     ctrl_lines = lines!(ax_img, control_points, color = (:grey, 0.5), linestyle = :dash)
 
     ### WORKAROUND
 
-    SmoothPoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_pts], BigDataStore[:current_curve_type]) do cc, pts, ct
-        
-        if is_bezier(ct)
-            
-            idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
-            idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
-            return cc.points[idx_main_cp[idx_smooth]]
+    SmoothPoints = lift(BigDataStore[:current_curve]) do CD
+        pts = CD.points
+        ct = CD.curve_type
+        if ct == :bezier
+            idx_main_cp = filter(i -> is_control_point(i), eachindex(pts))
+            idx_smooth = filter(i -> CD.is_smooth[i], eachindex(CD.is_smooth))
+            return pts[idx_main_cp[idx_smooth]]
         else
             return pts
         end
     end
 
-    SharpPoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_type]) do cc, ct
-        if is_bezier(ct)
-            idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
-            idx_sharp = filter(i -> !cc.is_smooth[i], eachindex(cc.is_smooth))
-            return cc.points[idx_main_cp[idx_sharp]]
+    SharpPoints = lift(BigDataStore[:current_curve]) do CD
+        pts = CD.points
+        ct = CD.curve_type
+        if ct == :bezier
+            idx_main_cp = filter(i -> is_control_point(i), eachindex(pts))
+            idx_sharp = filter(i -> !CD.is_smooth[i], eachindex(CD.is_smooth))
+            return pts[idx_main_cp[idx_sharp]]
         else
-            return Vector{eltype(cc.points)}()
+            return Vector{eltype(pts)}()
         end
     end
 
-    HandlePoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_type]) do cc, ct
-        if is_bezier(ct)
-            idx_handle_pts = filter(i -> !is_control_point(i), eachindex(cc.points))
-            return cc.points[idx_handle_pts]
+    HandlePoints = lift(BigDataStore[:current_curve]) do CD
+        pts = CD.points
+        ct = CD.curve_type
+        if ct == :bezier
+            idx_handle_pts = filter(i -> !is_control_point(i), eachindex(pts))
+            return pts[idx_handle_pts]
         else
-            return Vector{eltype(cc.points)}()
+            return Vector{eltype(pts)}()
         end
     end
 
@@ -372,7 +367,7 @@ function main(;
 
     
 
-    curve_controls = [tb_curve_name, BigDataStore[:current_color], BigDataStore[:current_curve], label_curve_name]
+    curve_controls = [tb_curve_name, BigDataStore[:current_curve], label_curve_name]
     BigDataStore[:curve_controls] = curve_controls
 
     #########    BOTTOM    #############################################################################################
@@ -424,100 +419,100 @@ function main(;
 
     on(btn_add_curve.clicks) do _
         
-        #just add a new curve 
-        inext= length(BigDataStore[:ALL_CURVES])+1
-        new_name = "Curve $inext"
-        pts = get_initial_curve_pts(BigDataStore[:scale_rect][])
+        # #just add a new curve 
+        # inext= length(BigDataStore[:ALL_CURVES])+1
+        # new_name = "Curve $inext"
+        # pts = get_initial_curve_pts(BigDataStore[:scale_rect][])
         
 
-        next_color_id = mod(inext, num_colors) + 1
-        new_color = BigDataStore[:cmap][next_color_id]
-        nt = (;name = new_name,
-               color = new_color,
-               points= pts,
-               is_smooth = [false, false],
-               curve_type = menu_curve_type.selection[], 
-               )     
+        # next_color_id = mod(inext, num_colors) + 1
+        # new_color = BigDataStore[:cmap][next_color_id]
+        # nt = (;name = new_name,
+        #        color = new_color,
+        #        points= pts,
+        #        is_smooth = [false, false],
+        #        curve_type = menu_curve_type.selection[], 
+        #        )     
         
-        push!(BigDataStore[:ALL_CURVES], nt)
-        BigDataStore[:edited_curve_id][] = inext
-        rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+        # push!(BigDataStore[:ALL_CURVES], nt)
+        # BigDataStore[:edited_curve_id][] = inext
+        # rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
         
-        update_current_curve_controls!(BigDataStore, nt)
+        # update_current_curve_controls!(BigDataStore, nt)
         
-        switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
+        # switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], inext, BigDataStore[:other_curve_plots])
         
-        status_text[] = "Added new curve $new_name"
-        menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
-        # menu_curve_type.i_selected[] = 1 #bezier
+        # status_text[] = "Added new curve $new_name"
+        # menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
+        # # menu_curve_type.i_selected[] = 1 #bezier
     end
 
     on(btn_rem_curve.clicks) do _
         #remove the current curve
-        num_curves = length(BigDataStore[:ALL_CURVES])
-        if num_curves >1
-            id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
-            old_name = BigDataStore[:ALL_CURVES][id_delete].name
-            deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
-            rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
-            BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
-            update_current_curve_controls!(BigDataStore)#we should also update the color etc...
-            switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
-                                BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
-            status_text[] = "Removed curve $old_name"
-        end
+        # num_curves = length(BigDataStore[:ALL_CURVES])
+        # if num_curves >1
+        #     id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
+        #     old_name = BigDataStore[:ALL_CURVES][id_delete].name
+        #     deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
+        #     rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+        #     BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
+        #     update_current_curve_controls!(BigDataStore)#we should also update the color etc...
+        #     switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
+        #                         BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
+        #     status_text[] = "Removed curve $old_name"
+        # end
     end
 
     # TODO proper update - issue with curve_pts
     on(menu_curves.selection) do s
-        if BigDataStore[:edited_curve_id][] == s || isnothing(s)
-            return nothing
-        end
-        
-        
-        BigDataStore[:edited_curve_id][] = s
-        cdata = BigDataStore[:ALL_CURVES][s]
-        BigDataStore[:current_curve_type][] = cdata.curve_type
-
-        ct = cdata.curve_type
-        if ct == :bezier 
-            BigDataStore[:current_curve][] = CubicBezierCurve(cdata.points, cdata.is_smooth)
-        else
-            BigDataStore[:current_curve_pts][] = cdata.points
-        end
-        
-        update_current_curve_controls!(BigDataStore)
-        switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
-
-        menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
-        status_text[] = "Editing curve $(cdata.name)"
-        # AC = BigDataStore[:ALL_CURVES]
-        # for nt in AC
-        #     @info "Curve type", nt.curve_type
+        # if BigDataStore[:edited_curve_id][] == s || isnothing(s)
+        #     return nothing
         # end
+        
+        
+        # BigDataStore[:edited_curve_id][] = s
+        # cdata = BigDataStore[:ALL_CURVES][s]
+        # BigDataStore[:current_curve_type][] = cdata.curve_type
+
+        # ct = cdata.curve_type
+        # if ct == :bezier 
+        #     BigDataStore[:current_curve][] = CubicBezierCurve(cdata.points, cdata.is_smooth)
+        # else
+        #     BigDataStore[:current_curve_pts][] = cdata.points
+        # end
+        
+        # update_current_curve_controls!(BigDataStore)
+        # switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
+
+        # menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
+        # status_text[] = "Editing curve $(cdata.name)"
+        # # AC = BigDataStore[:ALL_CURVES]
+        # # for nt in AC
+        # #     @info "Curve type", nt.curve_type
+        # # end
     end
 
     
 
     on(tb_curve_name.stored_string) do s
-        id = BigDataStore[:edited_curve_id][]
-        old_name = BigDataStore[:ALL_CURVES][id].name
-        update_curve!(BigDataStore; name = s)
-        #also update the menu entry
-        opts = menu_curves.options[]
-        # @info "opts", opts
-        opts[id] = (s, opts[id][2])
-        menu_curves.options[] = opts
-        menu_curves.i_selected[] = id
-        label_curve_name.text[] = "Current curve: $s"
-        status_text[] = "Changed curve from $old_name to $s"
+        # id = BigDataStore[:edited_curve_id][]
+        # old_name = BigDataStore[:ALL_CURVES][id].name
+        # update_curve!(BigDataStore; name = s)
+        # #also update the menu entry
+        # opts = menu_curves.options[]
+        # # @info "opts", opts
+        # opts[id] = (s, opts[id][2])
+        # menu_curves.options[] = opts
+        # menu_curves.i_selected[] = id
+        # label_curve_name.text[] = "Current curve: $s"
+        # status_text[] = "Changed curve from $old_name to $s"
         
     end
 
-    on(BigDataStore[:current_color]) do c
+    # on(BigDataStore[:current_color]) do c
         
-        update_curve!(BigDataStore; color= c)
-    end
+    #     # update_curve!(BigDataStore; color= c)
+    # end
 
     for (i, tb) in enumerate(tbscale)
         on(tb.stored_string) do s
@@ -542,23 +537,8 @@ function main(;
 
 
     on(menu_curve_type.selection) do s
-        pts = BigDataStore[:current_curve_pts][]
-        N = length(pts)
-        if !has_valid_number_of_points(N, s) #do something to make it valid for the current itp
-            reset_curve!(pts, s) #simplest case
-            # BigDataStore[:current_curve_pts][] = pts
-        end
-        if s == :bezier
-            BigDataStore[:current_curve][] = CubicBezierCurve(pts; all_sharp = true)
-        else
-            # t must be  sorted for the other interpolation types...
-            make_valid!(pts, s)
-            BigDataStore[:current_curve_pts][] = pts
-        end
-        
-        BigDataStore[:current_curve_type][] = s
-        
-        update_curve!(BigDataStore; curve_type = s)
+        CD = BigDataStore[:current_curve]
+        CD[] = change_curve_type(CD[], s)
         
     end
 
@@ -566,31 +546,31 @@ function main(;
     ##########################     RESET    ############################################################################
     ## TODO better reset
     on(events(fig).dropped_files) do files
-        isempty(files) && return nothing
+        # isempty(files) && return nothing
         
-        f1 = first(files)
-        BigDataStore[:export_folder] = dirname(f1)
-        println(f1)
-        try
-            BigDataStore[:ref_img][] = rotr90(load(f1))
+        # f1 = first(files)
+        # BigDataStore[:export_folder] = dirname(f1)
+        # println(f1)
+        # try
+        #     BigDataStore[:ref_img][] = rotr90(load(f1))
             
-        catch e
-            # @info "Probably not an image?"
-            status_text = "Cannot open this file. Probably not an image?"
-            return nothing
-        end
+        # catch e
+        #     # @info "Probably not an image?"
+        #     status_text = "Cannot open this file. Probably not an image?"
+        #     return nothing
+        # end
 
-        reset_limits!(ax_img) 
-        #reset most state 
-        if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
-            deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
-        end
-        reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
-        # @info "reset"
-        ntinit = initial_curve(BigDataStore; reset = true)
-        BigDataStore[:current_curve_type][] = :bezier
-        menu_curve_type.i_selected[] = ITP_Dict[:bezier] #1
-        status_text[] = "New image imported!"   
+        # reset_limits!(ax_img) 
+        # #reset most state 
+        # if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
+        #     deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
+        # end
+        # reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
+        # # @info "reset"
+        # ntinit = initial_curve(BigDataStore; reset = true)
+        # BigDataStore[:current_curve_type][] = :bezier
+        # menu_curve_type.i_selected[] = ITP_Dict[:bezier] #1
+        # status_text[] = "New image imported!"   
         
         # @info BigDataStore        
     end
@@ -598,36 +578,36 @@ function main(;
     ####################################################################################################################
 
     on(tb_export_num.stored_string) do s
-        n = 10
-        try n = parse(Int, s); catch; end
-        BigDataStore[:num_export][] = max(10, n)
-        status_text[] = "Curve export density = $n points"
+        # n = 10
+        # try n = parse(Int, s); catch; end
+        # BigDataStore[:num_export][] = max(10, n)
+        # status_text[] = "Curve export density = $n points"
     end
 
     on(btn_export.clicks) do _
-        N = BigDataStore[:num_export][]
-        format = menu_export.selection[]
-        #check if the are negative numbers when log scale range
-        for i in 1:2
-            if BigDataStore[:scale_type][][i] == :log
-                if BigDataStore[:plot_range][][2i-1] <= 0 || BigDataStore[:plot_range][][2i] <= 0 
-                    status_text[] =  "Cannot export, log scaling needs positive numbers.\n
-                                    Please set the X1, X2, Y1 or Y2 to be positive!"
-                    return nothing
-                end
-            end
-        end
+        # N = BigDataStore[:num_export][]
+        # format = menu_export.selection[]
+        # #check if the are negative numbers when log scale range
+        # for i in 1:2
+        #     if BigDataStore[:scale_type][][i] == :log
+        #         if BigDataStore[:plot_range][][2i-1] <= 0 || BigDataStore[:plot_range][][2i] <= 0 
+        #             status_text[] =  "Cannot export, log scaling needs positive numbers.\n
+        #                             Please set the X1, X2, Y1 or Y2 to be positive!"
+        #             return nothing
+        #         end
+        #     end
+        # end
          
-        export_curves(BigDataStore[:ALL_CURVES], 
-                    BigDataStore[:scale_rect][], 
-                    BigDataStore[:plot_range][], 
-                    BigDataStore[:scale_type][];
-                    N, 
-                    format, 
-                    export_folder = BigDataStore[:export_folder],
-                    sample_horizontal = BigDataStore[:export_horizontal][],
-                    )
-        status_text[] = "Exported files!"
+        # export_curves(BigDataStore[:ALL_CURVES], 
+        #             BigDataStore[:scale_rect][], 
+        #             BigDataStore[:plot_range][], 
+        #             BigDataStore[:scale_type][];
+        #             N, 
+        #             format, 
+        #             export_folder = BigDataStore[:export_folder],
+        #             sample_horizontal = BigDataStore[:export_horizontal][],
+        #             )
+        # status_text[] = "Exported files!"
     end
 ######################   MOUSE Interaction   ###########################################################################
     
@@ -654,11 +634,8 @@ function main(;
         end
         #try the control point curve
         idx = find_closest_point_to_position(BigDataStore[:current_curve][], mousepos; 
-                                                thresh = PICK_THRESHOLD, 
-                                                area= :square)
+                                                thresh = PICK_THRESHOLD)
         idx == -1 && return Consume(false)
-        # @info "snatched", idx
-        #found something
         target_observable = ctrl_lines
         dragged_index = idx
         return Consume(true)
@@ -677,27 +654,11 @@ function main(;
             BigDataStore[:scale_rect][] = current_points # Notify the Observable of the change
             return Consume(true)
         end
-        # @info "before", dragged_index
-        target_observable == ctrl_lines || return Consume(false)
-        # @info "ctrl"
-        if BigDataStore[:current_curve_type][] == :bezier
-            # @info "bezier"
-            cubic_curve = BigDataStore[:current_curve][]
-            move!(cubic_curve, dragged_index, new_data_pos)
-            BigDataStore[:current_curve][]  = cubic_curve 
-            # @info "done bezier"
-        else
-            # @info "itp"
-            pts = BigDataStore[:current_curve][].points
-            move_itp!(pts, dragged_index, new_data_pos)
-            BigDataStore[:current_curve_pts][] = pts
-            # @info "after itp"
-        end
         
-        # @info "moving PT", dragged_index, "num CP", length(current_points.points)
-        # Notify the Observable of the change
-        return Consume(true)
-         
+        target_observable == ctrl_lines || return Consume(false)
+        CD = BigDataStore[:current_curve]
+        CD[] = move(CD[], dragged_index, new_data_pos)
+        return Consume(true)   
     end
 
     # Interaction for releasing the mouse button
@@ -705,9 +666,8 @@ function main(;
         if event.button == Mouse.left && event.action == Mouse.release
             # Stop dragging
             dragged_index = -1
-            update_curve!(BigDataStore; 
-                          points = BigDataStore[:current_curve][].points,
-                          is_smooth = BigDataStore[:current_curve][].is_smooth)
+            cid = BigDataStore[:edited_curve_id][]
+            BigDataStore[:ALL_CURVES][cid] = BigDataStore[:current_curve][]
         end
         return Consume(false)
     end
@@ -721,52 +681,25 @@ function main(;
             # Check if we have a valid mouse position in data coordinates
             data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
 
-            CT = BigDataStore[:current_curve_type][]
-            
-            if CT == :bezier
-                current_points = BigDataStore[:current_curve][]
-                # segid = find_closest_segment(current_points, data_pos)
-                segid = find_closest_projected_segment(current_points, data_pos)
-                add_segment!(current_points, segid)
-                BigDataStore[:current_curve][] = current_points
-                return Consume(true)
-            end
-            
-            #not a bezier
-            pts = BigDataStore[:current_curve][].points
-            add_point!(pts, data_pos)
-            BigDataStore[:current_curve_pts][] = pts
+            CD = BigDataStore[:current_curve]
+            CD[] = add(CD[], data_pos)
             return Consume(true)
         end
 
         if event.key == Keyboard.d # delete closest main segment (removes 3 points from curve)
             data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
+
+            CD = BigDataStore[:current_curve]
+            CD[] = rem(CD[], data_pos)
             
-            CT = BigDataStore[:current_curve_type][]
-
-            if CT == :bezier
-                current_points = BigDataStore[:current_curve][]
-                cpid = find_closest_control_point_to_position(current_points, data_pos)
-                remove_control_point!(current_points, cpid)
-                BigDataStore[:current_curve][] = current_points 
-                return Consume(true)
-            end
-
-            #not a bezier
-            pts = BigDataStore[:current_curve][].points
-            remove_point!(pts, data_pos; min_pts = minimum_points(CT))
-            BigDataStore[:current_curve_pts][] = pts #
             return Consume(true)
         end
         
         if event.key == Keyboard.s #toggle is_smooth of the closest CP
-            BigDataStore[:current_curve_type][] == :bezier || return Consume(true) #no effect for other curve types
-
             data_pos = try Makie.mouseposition(ax_img.scene) catch; return Consume(false) end
-            current_points = BigDataStore[:current_curve][]
-            cp_id = find_closest_control_point_to_position(current_points, data_pos)
-            toggle_smoothness(current_points, cp_id)
-            BigDataStore[:current_curve][] = current_points
+            
+            CD = BigDataStore[:current_curve]
+            CD[] = toggle_sharp(CD[], data_pos)
             return Consume(true)
         end
 
@@ -789,7 +722,7 @@ end
 # create for each color a button and behavior
 function populate_color_chooser(fig::Figure, grid::GridLayout, 
                             colormap_entries, 
-                            current_color::Observable, 
+                            current_curve::Observable, 
                             is_open:: Observable;
                             btn_height = 30,
                             num_color_cols = 4,
@@ -817,7 +750,8 @@ function populate_color_chooser(fig::Figure, grid::GridLayout,
         
         # When a button is clicked, update the selected color and close the dropdown
         on(btn.clicks) do _
-            current_color[] = entry
+            # current_color[] = entry
+            current_curve[] = update(current_curve[];color = entry)
             is_open[] = false
         end
     end

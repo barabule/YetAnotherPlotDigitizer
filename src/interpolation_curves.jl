@@ -203,13 +203,16 @@ function reset_curve!(pts::Vector{PT}, itp::Symbol) where PT
     P1, PN = pts[1], pts[N]
 
     if N > Nmin && itp == :bezier # delete some points in the 'middle' to get a valid cubic bezier
-        next_N = 3 * (div(N-1,3)) + 1 #next valid no of control points
+        nsegs = div(N-1, 3)
+        next_N = 3 * nsegs + 1 #next valid no of control points
         @assert next_N <= N
         #we have at least 4 points, and want to preserve the starting and ending tangency
         m = N - next_N
         idx = 3:3+m-1
         deleteat!(pts, idx)
-
+        # if !has_valid_number_of_points(pts, itp)
+        #     @info "next_N", next_N, "N initial", N, "m", m 
+        # end
     elseif N<Nmin #return the minimum viable amount of points in a line from the 1st to the last point in pts
         m = Nmin - N
         push!(pts, fill(zero(PT), m)...)
@@ -219,7 +222,11 @@ function reset_curve!(pts::Vector{PT}, itp::Symbol) where PT
             pts[i] = P1 * (1-t) + PN * t
         end
     end
-    
+    if !has_valid_number_of_points(pts, itp)
+        # @info "pts", pts
+        # @info "N initial", N
+    end
+    @assert has_valid_number_of_points(pts, itp) "invalid number of points"
     return nothing
 end
 
@@ -227,17 +234,20 @@ function make_valid!(pts::Vector{PT}, itp::Symbol) where PT
     itp == :bezier && return nothing
 
     ordering = sign(last(pts)[1]- first(pts)[1]) # 1 for increasing, -1 for decreasing
+    # @info "order", ordering
     for i in eachindex(pts)
         i==firstindex(pts) && continue
 
         ti = pts[i][1]
         ti_before = pts[i-1][1]
-
-        if sign(ti - ti_before) != ordering 
-            dti = i==lastindex(pts) ? pts[i][1] - pts[i-1][1] : pts[i+1][1] - pts[i][1]
+        dt = ti - ti_before
+        if sign(dt) != ordering 
+            # @info "ordering i", sign(ti - ti_before)
             
-            pts[i] = PT(ti_before + ordering * dti*1e-3, pts[i][2]) #shift ti to be 'after ti_before'
+            new_t = ti_before + ordering * 1e-3
+            pts[i] = PT(new_t, pts[i][2]) #shift ti to be 'after ti_before'
         end
     end
+    @assert issorted(first.(pts))
     return nothing
 end

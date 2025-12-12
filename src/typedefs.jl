@@ -21,8 +21,8 @@ function ScaleType(s::Symbol)
 end
 
 
-struct CubicBezierCurve{PT<:Point2{<:Real}} 
-    points::Vector{PT} #ordering: CP handle handle CP handle handle etc
+struct CubicBezierCurve{T<:Real} 
+    points::Vector{SVector{2, T}} #ordering: CP handle handle CP handle handle etc
     is_smooth::Vector{Bool}
     
     function CubicBezierCurve(pts::Vector, is_smooth::Vector{Bool})
@@ -30,8 +30,8 @@ struct CubicBezierCurve{PT<:Point2{<:Real}}
         num_CP = length(is_smooth)
         @assert npts>=4 && mod(npts-1, 3)==0
         @assert num_CP >= 2 && num_CP == div(npts-1, 3) + 1
-        PT = eltype(pts)
-        return new{PT}(pts, is_smooth)
+        T = eltype(first(pts))
+        return new{T}(pts, is_smooth)
     end
 end
 
@@ -60,6 +60,7 @@ end
 
 function number_of_cubic_segments(pts::Vector{PT}) where PT
     N = length(pts)
+    # @info "N", N
     div(N-1, 3)
 end
 
