@@ -457,12 +457,19 @@ function main(;
         if num_curves >1
             id_delete = BigDataStore[:edited_curve_id][]#delete the current curve
             old_name = BigDataStore[:ALL_CURVES][id_delete].name
+            #problem
+            id_next = lastindex(BigDataStore[:ALL_CURVES]) 
+            BigDataStore[:edited_curve_id][] = id_next#set the current curve to the last in the list
+            BigDataStore[:current_curve][] = BigDataStore[:ALL_CURVES][id_next]
             deleteat!(BigDataStore[:ALL_CURVES], id_delete[])
+            BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES]) #changed after delete
             rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
-            BigDataStore[:edited_curve_id][] = lastindex(BigDataStore[:ALL_CURVES])#set the current curve to the last in the list
+            
             update_current_curve_controls!(BigDataStore)#we should also update the color etc...
             switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], 
                                 BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
+                                
+            menu_curves.i_selected[] = BigDataStore[:edited_curve_id][]
             status_text[] = "Removed curve $old_name"
         end
     end
