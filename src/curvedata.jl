@@ -93,22 +93,13 @@ end
 
 function update(CD::CurveData; 
                 name = nothing,
-                color = nothing,
-                curve_type = nothing)
+                color = nothing,)
 
 
     pts = CD.points
-    ct = CD.curve_type
+    
     is_smooth = CD.is_smooth
 
-    if !isnothing(curve_type)
-        @assert typeof(curve_type) == typeof(ct)
-        if curve_type == :bezier && ct != curve_type
-            is_smooth = fill(false, div(length(pts)-1, 3)) #in case we switch to bezier, we need correct number of is_smooth
-        end
-    else
-        curve_type = ct
-    end
     
     name =isnothing(name) ? CD.name : name
     @assert typeof(name) == typeof(CD.name)
@@ -120,8 +111,38 @@ function update(CD::CurveData;
         name,
         pts,
         color,
-        curve_type,
+        CD.curve_type,
         is_smooth,
+    )
+end
+
+
+function change_curve_type(CD::CurveData, ct::Symbol)
+    @assert in(ct, InterpolationTypeList) "$ct not found in curve type list"
+
+    ct_prev = CD.curve_type
+
+    ct == ct_prev && return CD #no effect
+
+    pts = CD.points
+    N = length(pts)
+    
+    if !has_valid_number_of_points(N, ct)#check if valid amound of points for the new ct
+        make_valid!(pts, ct)
+    end
+
+    if ct == :bezier
+        is_smooth = fill(false, div(length(pts)-1, 3))
+    else
+        is_smooth = CD.is_smooth
+    end
+
+    return CurveData(
+        CD.name,
+        pts,
+        CD.color,
+        ct,
+        is_smooth
     )
 end
 
@@ -170,7 +191,6 @@ end
 
 
 function toggle_sharp(CD::CurveData, pos)
-    
     ct = CD.curve_type
     ct == :bezier || return CD
 
@@ -178,7 +198,7 @@ function toggle_sharp(CD::CurveData, pos)
     C = CubicBezierCurve(pts, CD.is_smooth)
     cp_id = find_closest_control_point_to_position(C, pos)
     toggle_smoothness(C, cp_id)
-    
+
     return CurveData(
         CD.name,
         C.points,
