@@ -1,3 +1,7 @@
+
+
+
+
 abstract type ScaleType end
 
 struct LogScaleType<:ScaleType

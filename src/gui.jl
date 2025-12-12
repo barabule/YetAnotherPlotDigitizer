@@ -104,16 +104,21 @@ function main(;
 
     ) #holds everything
     
+
+
+
     reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect]) #set to default positions
 
-    BigDataStore[:current_curve] = Observable(CubicBezierCurve(get_initial_curve_pts(BigDataStore[:scale_rect][])))
+    # BigDataStore[:current_curve] = Observable(CubicBezierCurve(get_initial_curve_pts(BigDataStore[:scale_rect][])))
 
     ntinit = (;name= "Curve 01", 
             color = BigDataStore[:current_color][], 
-            points = BigDataStore[:current_curve][].points, 
+            points = get_initial_curve_pts(BigDataStore[:scale_rect][]), 
             is_smooth=[false, false],
             curve_type = :bezier,
             )
+
+    BigDataStore[:current_curve] = Observable(ntinit)
     BigDataStore[:ALL_CURVES] = [ntinit]
 
 
@@ -268,30 +273,31 @@ function main(;
     
     #hi res sampling of the current curve
     
-    BigDataStore[:current_curve_pts] = CC = lift(BigDataStore[:current_curve]) do C
-        pts = C.points
-    end
+    # BigDataStore[:current_curve_pts] = CC = lift(BigDataStore[:current_curve]) do C
+    #     pts = C.points
+    # end
 
-    bezier_curve = lift(CC, BigDataStore[:current_curve_type]) do C, ct
+    BigDataStore[:current_curve_pts] = CC = Observable(BigDataStore[:current_curve][].points) #first time
+
+
+    fine_curve_points = lift(BigDataStore[:current_curve], CC, BigDataStore[:current_curve_type]) do CP, C, ct
         N = BigDataStore[:number_of_fine_points]
         if ct == :bezier
-            nseg = number_of_cubic_segments(C)
+
+            nseg = number_of_cubic_segments(CP.points)
             N_segments = round(Int, N / nseg)
-            return piecewise_cubic_bezier(C; N_segments)
+            return piecewise_cubic_bezier(CP; N_segments)
         else
             itp = make_new_interpolator(C, ct)
             return eval_pts(itp; N)
         end
     end
-    # bezier_curve = lift(BigDataStore[:current_curve]) do CP
-    #     pts = CP.points
-    #     piecewise_cubic_bezier(pts; N_segments = 50)
-    # end
+    
     cname = lift(BigDataStore[:edited_curve_id]) do id
         nt = BigDataStore[:ALL_CURVES][id]
         nt.name
     end
-    edited_curve_fine_plot = lines!(ax_img, bezier_curve, 
+    edited_curve_fine_plot = lines!(ax_img, fine_curve_points, 
                                     color = BigDataStore[:current_color], 
                                     linewidth = 0.2 * MARKER_SIZE,
                                     alpha = 0.6,
@@ -302,14 +308,17 @@ function main(;
     
 
     #control pts
-    ctrl_lines = lines!(ax_img, CC, color = (:grey, 0.5), linestyle = :dash)
+    control_points = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_pts], BigDataStore[:current_curve_type]) do cc, pts, ct
+        pts = ct == :bezier ? cc.points : pts
+    end
+    ctrl_lines = lines!(ax_img, control_points, color = (:grey, 0.5), linestyle = :dash)
 
     ### WORKAROUND
 
-    SmoothPoints = lift(BigDataStore[:current_curve_pts], BigDataStore[:current_curve_type]) do pts, ct
+    SmoothPoints = lift(BigDataStore[:current_curve], BigDataStore[:current_curve_pts], BigDataStore[:current_curve_type]) do cc, pts, ct
         
         if is_bezier(ct)
-            cc = BigDataStore[:current_curve][]
+            
             idx_main_cp = filter(i -> is_control_point(i), eachindex(cc.points))
             idx_smooth = filter(i -> cc.is_smooth[i], eachindex(cc.is_smooth))
             return cc.points[idx_main_cp[idx_smooth]]
@@ -468,12 +477,19 @@ function main(;
         
         BigDataStore[:edited_curve_id][] = s
         cdata = BigDataStore[:ALL_CURVES][s]
-        
-        menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
+        BigDataStore[:current_curve_type][] = cdata.curve_type
 
+        ct = cdata.curve_type
+        if ct == :bezier 
+            BigDataStore[:current_curve][] = CubicBezierCurve(cdata.points, cdata.is_smooth)
+        else
+            BigDataStore[:current_curve_pts][] = cdata.points
+        end
+        
         update_current_curve_controls!(BigDataStore)
         switch_other_curves_plot!(ax_img, BigDataStore[:ALL_CURVES], s, BigDataStore[:other_curve_plots])
-        
+
+        menu_curve_type.i_selected[] = ITP_Dict[cdata.curve_type]
         status_text[] = "Editing curve $(cdata.name)"
         # AC = BigDataStore[:ALL_CURVES]
         # for nt in AC
@@ -883,12 +899,7 @@ function update_current_curve_controls!(D::Dict{Symbol, Any}, cdata=nothing)
     TB, current_color, current_curve, crv_label = curve_controls
     # TB.placeholder[] = cdata.name #this doesn't do anything
     current_color[] = cdata.color 
-    ct = D[:current_curve_type][]
-    if ct == :bezier 
-        current_curve[] = CubicBezierCurve(cdata.points, cdata.is_smooth)
-    else
-        D[:current_curve_pts][] = cdata.points
-    end
+    
 
     crv_label.text[] = "Current curve: $(cdata.name)"
 

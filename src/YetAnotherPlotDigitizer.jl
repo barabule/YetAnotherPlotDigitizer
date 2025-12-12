@@ -17,6 +17,7 @@ using DataInterpolations
 include("typedefs.jl")
 include("bezier.jl")
 include("interpolation_curves.jl")
+include("curvedata.jl")
 include("gui.jl")
 
 export main
