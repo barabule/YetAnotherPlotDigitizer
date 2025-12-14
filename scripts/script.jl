@@ -2,6 +2,6 @@ import Pkg; Pkg.activate("scripts")
 
 using YetAnotherPlotDigitizer
 
-main()
+main(PICK_THRESHOLD = 30)
 
 

@@ -581,9 +581,12 @@ function main(;
 
     on(tb_export_num.stored_string) do s
         # n = 10
-        try n = parse(Int, s); catch; end
-        BigDataStore[:num_export][] = max(10, n)
-        status_text[] = "Curve export density = $n points"
+        try 
+            n = parse(Int, s)
+            BigDataStore[:num_export][] = max(10, n)
+            status_text[] = "Curve export density = $n points"
+        catch
+        end
     end
 
     on(btn_export.clicks) do _

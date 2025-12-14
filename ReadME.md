@@ -71,6 +71,7 @@ main()
 * Each main control point can be smooth or sharp (toggled by the 's' key).
 * 'Sharp' means that the associated handle points can be moved independently from each other.
 * For smooth control points the 2 handle points are always collinear with the main point. This is very similar to how a vector editor works.
+* New: You can switch between multiple interpolation curves besides Bezier: Linear, Akima (local cubic spline), Cubic Spline, PCHIP (cubic spline without overshoot)
 * You can't delete the last 2 remaining control points.
 ![Curve editing](assets/curve_editing.gif) "Curve editing"
 ## Other Controls

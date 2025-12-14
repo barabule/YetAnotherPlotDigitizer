@@ -1,6 +1,6 @@
 name = "YetAnotherPlotDigitizer"
 uuid = "e2b36d35-08f8-4606-b6fb-bb58ec6d10e6"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["barabule <werner.zanzinger@gmail.com>"]
 
 [deps]
