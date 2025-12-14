@@ -77,7 +77,7 @@ function main(;
                     :scale_type => Observable([:linear, :linear]),
                     :plot_range => Observable([0.0, 1.0, 0.0, 1.0]), #x1,x2,y1,y2 scaling ranges
                     :freeze_scale => nothing, #observable to indicate if the scale markers can be moved
-                    #plotting
+                    #plottin'
                     :marker_handles => HollowCircleMarker,
                     :marker_smooth => HollowCircleMarker,
                     :marker_sharp => HollowDiamondMarker,
@@ -95,11 +95,8 @@ function main(;
                     #curve data
                     :edited_curve_id => Observable(1), #id of the current curve
                     :current_curve => nothing, #control for current curve
-                    # :current_curve_pts => nothing, #holds just the control points
-                    # :current_color => Observable(first(cmap)), #color of currently edited curve
                     :other_curve_plots => [], #holds the plot objects for other curves than the current
                     :ALL_CURVES => [], #holds all curve data
-                    # :current_curve_type => Observable(:bezier), #indicates if the current curve is bezier or interpolating
                     :number_of_fine_points => number_of_fine_points, #no of points to plot for fine curves
 
     ) #holds everything
@@ -273,15 +270,6 @@ function main(;
                         
     )
     
-    
-    #hi res sampling of the current curve
-    
-    # BigDataStore[:current_curve_pts] = CC = lift(BigDataStore[:current_curve]) do C
-    #     pts = C.points
-    # end
-
-    # BigDataStore[:current_curve_pts] = CC = Observable(BigDataStore[:current_curve][].points) #first time
-
     # SMOOTH EDITED CURVE
     fine_curve_points = lift(BigDataStore[:current_curve]) do CD
         N = BigDataStore[:number_of_fine_points]

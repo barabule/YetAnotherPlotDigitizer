@@ -150,6 +150,11 @@ function change_curve_type(CD::CurveData, ct::Symbol)
 end
 
 
+"""
+    eval_curve(CD::CurveData; samples = 1000)
+
+Evaluates CD in samples points uniformly in parameter space.
+"""
 function eval_curve(CD::CurveData; samples = 1000)# for plotting
 
     pts = CD.points
@@ -168,6 +173,16 @@ function eval_curve(CD::CurveData; samples = 1000)# for plotting
 end
 
 
+"""
+    sample_curve(CD::CurveData; 
+                    samples = 1000, 
+                    arclen = false, 
+                    lut_samples = 100)
+
+Samples points from curve CD.
+arclen - bool indicating if arclen sampling should be used (samples are approximately uniform along the curve arclenth)
+If arclen is false - the samples are uniform in the 1st coordinate.
+"""
 function sample_curve(CD::CurveData; 
                     samples = 1000, 
                     arclen = false, 
@@ -212,6 +227,15 @@ function toggle_sharp(CD::CurveData, pos)
     )
 end
 
+"""
+    CurveData(bbox::Tuple{T, T, T, T}, name, color;
+                    itp = :bezier::Symbol) where T<:Real
+
+Construct a default curve from a bounding box.
+bbox should be a tuple with (xmin, xmax, ymin, ymax) values.
+Makes a new curve of interpolation type given by Symbol itp with minimum amount of points.
+4 for Bezier, 2 for Linear etc...
+"""
 function CurveData(bbox::Tuple{T, T, T, T}, name, color;
                     itp = :bezier::Symbol) where T<:Real
 

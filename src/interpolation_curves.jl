@@ -1,31 +1,98 @@
 
-ITP = DataInterpolations.AbstractInterpolation
+####  List of possible interpolation curves
+
+
 #allowable interpolation types
 const InterpolationTypeList = (
     :bezier,
     :linear,
     :akima,
+    :pchip,
+    :cubicspline,
+    :quadraticspline,
     :constant,
     :smoothedconstant,
-    :quadraticspline,
-    :cubicspline,
-    :pchip,
-    # :bspline,
+    :nearestneighbor,
 )
 
 const InterpolationTypeNames = (
     "Bezier",
     "Linear",
     "Akima",
+    "PCHIP",
+    "CubicSpline",
+    "QuadraticSpline",
     "Constant",
     "SmoothedConstant",
-    "QuadraticSpline",
-    "CubicSpline",
-    "PCHIP",
-    # "BSpline",
+    "NearestNeighbor",
 )
 
 ITP_Dict = Dict{Symbol, Integer}(InterpolationTypeList[i] => i  for i in eachindex(InterpolationTypeList))
+
+
+struct NearestNeighborInterpolator{T<:Real}
+    u::Vector{T}
+    t::Vector{T}
+
+    function NearestNeighborInterpolator(u::Vector, t::Vector)
+        @assert issorted(t) "t must be sorted!"
+        @assert length(u) == length(t)
+        T = promote_type(eltype(u), eltype(t))
+        return new{T}(T.(u), T.(t))
+    end
+end
+
+function (NN::NearestNeighborInterpolator{T})(ti::T) where T
+    u, t = NN.u, NN.t
+    ti <= first(t) && return first(u)
+    ti >= last(t)  && return last(u)
+    ordering = sign(last(t) - first(t)) # 1 for increasing
+    for i in eachindex(t)
+        i==firstindex(t) && continue
+        if sign(t[i] - ti) == ordering
+            dt1 = abs(ti - t[i-1])
+            dt2 = abs(t[i] - ti)
+            ui = dt1 < dt2 ? u[i-1] : u[i]
+            return ui
+        end
+    end
+end
+
+
+function (NN::NearestNeighborInterpolator{T})(tvec::AbstractVector{T}) where T
+    tsorted = issorted(tvec) ? tvec : sort(tvec)
+    u, t = NN.u, NN.t
+    out = zeros(T, length(tsorted))
+    last_idx = firstindex(t)
+    ordering = sign(last(t)  - first(t)) # +1 for increasing, -1 for decreasing
+    for i in eachindex(out)
+        ti = tvec[i]
+        if ti == first(t)
+            out[i] = first(u)
+            continue
+        end
+        if ti == last(t)
+            out[i] = last(u)
+            continue
+        end
+        for j in last_idx+1:length(out)
+            if sign(t[j]- ti) == ordering
+                # @info "ti", ti, "tj", t[j]
+                dt1 = abs(ti - t[j-1])
+                dt2 = abs(t[j] - ti)
+                out[i] = dt1 < dt2 ? u[j-1] : u[j]
+                last_idx = j-1
+                break
+            end
+        end
+    end
+    return out
+end
+
+
+ITP = Union{DataInterpolations.AbstractInterpolation, NearestNeighborInterpolator}
+
+
 
 function make_new_interpolator(pts::Vector{PT}, interpolatortype::Symbol) where PT
     if interpolatortype == :bezier
@@ -65,6 +132,9 @@ function make_new_interpolator(pts::Vector{PT}, interpolatortype::Symbol) where 
         itp = QuadraticSpline
     end
 
+    if interpolatortype == :nearestneighbor
+        itp = NearestNeighborInterpolator
+    end
     if interpolatortype == :bspline
         return BSplineInterpolation(u, t, 3, :ArcLen, :Uniform)
     end
