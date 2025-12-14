@@ -543,33 +543,38 @@ function main(;
     ##########################     RESET    ############################################################################
     ## TODO better reset
     on(events(fig).dropped_files) do files
-        # isempty(files) && return nothing
+        isempty(files) && return nothing
         
-        # f1 = first(files)
-        # BigDataStore[:export_folder] = dirname(f1)
-        # println(f1)
-        # try
-        #     BigDataStore[:ref_img][] = rotr90(load(f1))
+        f1 = first(files)
+        BigDataStore[:export_folder] = dirname(f1)
+        println(f1)
+        try
+            BigDataStore[:ref_img][] = rotr90(load(f1))
             
-        # catch e
-        #     # @info "Probably not an image?"
-        #     status_text = "Cannot open this file. Probably not an image?"
-        #     return nothing
-        # end
+        catch e
+            # @info "Probably not an image?"
+            status_text = "Cannot open this file. Probably not an image?"
+            return nothing
+        end
 
-        # reset_limits!(ax_img) 
+        reset_limits!(ax_img) 
         # #reset most state 
-        # if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
-        #     deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
-        # end
-        # reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
+        if length(BigDataStore[:ALL_CURVES])>=2 #drop all but the 1st curve
+            deleteat!(BigDataStore[:ALL_CURVES], 2:length(BigDataStore[:ALL_CURVES]))
+        end
+        reset_marker_positions!(size(BigDataStore[:ref_img][]), BigDataStore[:scale_rect])
         # # @info "reset"
-        # ntinit = initial_curve(BigDataStore; reset = true)
-        # BigDataStore[:current_curve_type][] = :bezier
-        # menu_curve_type.i_selected[] = ITP_Dict[:bezier] #1
-        # status_text[] = "New image imported!"   
+        BigDataStore[:edited_curve_id][] = 1
+        BigDataStore[:current_curve][] = CurveData(BBOX[], "Curve 1", first(cmap)) #this will update the 1st entry in ALLCURVES
+       
+        menu_curve_type.i_selected[] = ITP_Dict[:bezier] #1
         
-        # @info BigDataStore        
+        rebuild_menu_options!(menu_curves, BigDataStore[:ALL_CURVES])
+        update_current_curve_controls!(BigDataStore)
+        switch_other_curves_plot!(ax_img,BigDataStore[:ALL_CURVES], BigDataStore[:edited_curve_id][], BigDataStore[:other_curve_plots])
+        menu_curves.i_selected[] = 1
+        status_text[] = "New image imported!"   
+        # # @info BigDataStore        
     end
 
     ####################################################################################################################
