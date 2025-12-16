@@ -181,12 +181,14 @@ function eval_pts_arclen(itp::ITP; samples = 1000, LUT_size = 100)
     u = itp.u
 
     tlut = LinRange(first(t), last(t), LUT_size)
-    LUT = cumsum(itp(tlut)) #arclen lut
+    uLUT = itp(tlut) 
+    T = eltype(uLUT)
+    LUT = vcat(T(0), cumsum( [norm((tlut[i] - tlut[i-1], uLUT[i]-uLUT[i-1])) for i in 2:LUT_size]))
     Ltotal = last(LUT)
-
+    # @info "Ltotal", Ltotal
     Li = LinRange(0, Ltotal, samples)
     
-    P1 = SVector{2}(first(tlut), first(LUT))
+    P1 = SVector{2}(first(tlut), first(uLUT))
     PT = typeof(P1)
     out = [P1]
     previndex = 1
