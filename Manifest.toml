@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.2"
+julia_version = "1.12.3"
 manifest_format = "2.0"
-project_hash = "9ba4e15fef8191f2fccc77f109673d864eb26b18"
+project_hash = "552a03c3a2d1d3227b0bb460bfd98e97ee741e52"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -408,6 +408,11 @@ weakdeps = ["Mmap", "Test"]
     [deps.FilePathsBase.extensions]
     FilePathsBaseMmapExt = "Mmap"
     FilePathsBaseTestExt = "Test"
+
+[[deps.FileTypes]]
+git-tree-sha1 = "901e71171cc95f4d43c55c710b3930fac21d1c64"
+uuid = "b58e86d0-4a47-4fce-a54d-8006a143ed90"
+version = "0.1.1"
 
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -1073,7 +1078,7 @@ version = "0.44.2+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.12.0"
+version = "1.12.1"
 weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
@@ -1610,10 +1615,10 @@ uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.6.0+0"
 
 [[deps.YetAnotherPlotDigitizer]]
-deps = ["Colors", "DelimitedFiles", "FileIO", "GLMakie", "LinearAlgebra", "Observables", "Pkg", "StaticArrays"]
+deps = ["Colors", "DataInterpolations", "DelimitedFiles", "FileIO", "GLMakie", "LinearAlgebra", "Observables", "Pkg", "StaticArrays"]
 path = "."
 uuid = "e2b36d35-08f8-4606-b6fb-bb58ec6d10e6"
-version = "0.3.0"
+version = "0.4.0"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
