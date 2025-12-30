@@ -2,3 +2,5 @@ src/crap.jl
 src/minimal.jl
 .gitignore
 assets/bad.png
+scripts/Manifest.toml
+Manifest.toml

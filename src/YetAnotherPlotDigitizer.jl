@@ -12,7 +12,7 @@ using Colors
 using DelimitedFiles
 using Pkg
 using DataInterpolations
-
+using FileTypes
 
 include("typedefs.jl")
 include("bezier.jl")

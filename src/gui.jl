@@ -537,7 +537,9 @@ function main(;
         BigDataStore[:export_folder] = dirname(f1)
         println(f1)
         try
-            BigDataStore[:ref_img][] = rotr90(load(f1))
+            if Is(FileType.Image, f1) #restrict to just image files
+                BigDataStore[:ref_img][] = rotr90(load(f1))
+            end
             
         catch e
             # @info "Probably not an image?"
