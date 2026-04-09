@@ -1,3 +1,8 @@
+
+function (@main)(ARGS)
+    main()
+end
+
 function main(;
         num_colors = 32,
         color_btn_height = 30,
