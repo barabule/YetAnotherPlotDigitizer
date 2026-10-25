@@ -13,6 +13,7 @@ function main(;
         MARKER_SIZE = 25,
         SCALE_MARKER_SIZE = 12,
         number_of_fine_points = 1000,
+        scale_lines_thickness = 4.0,
         )
 
     #######GLOBALS###########################
@@ -252,12 +253,23 @@ function main(;
 
 
 
+
     ####################    PLOTS     ##################################################################################
 
     
     #BG Image
     img_plot = image!(ax_img, BigDataStore[:ref_img])
     #SCALE MARKERS
+    xmarkers = lift(BigDataStore[:scale_rect]) do rect
+        p1, p2 = rect[1], rect[2]
+        return [p1[1], p2[1]]
+    end
+    ymarkers = lift(BigDataStore[:scale_rect]) do rect
+        p3, p4 = rect[3], rect[4]
+        return [p3[2], p4[2]]
+    end
+    vlines!(ax_img, xmarkers, color = :red, alpha = 0.7, linestyle = :dash, linewidth = scale_lines_thickness)
+    hlines!(ax_img, ymarkers, color= :green, alpha = 0.7, linestyle = :dash, linewidth = scale_lines_thickness)
     scaling_pts = (scatter!(ax_img, BigDataStore[:scale_rect], color = [:red, :red, :green, :green], 
                                 marker = RingBarMarker,
                                 markersize = SCALE_MARKER_SIZE,
