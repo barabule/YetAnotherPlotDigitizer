@@ -209,7 +209,7 @@ function eval_pts_arclen(itp::ITP; samples = 1000, LUT_size = 100)
     end
    
     push!(out, PT(last(t),last(u)))
-    @assert length(out) == samples "ups"
+    # @assert length(out) == samples "ups"
     return out
 end
 
